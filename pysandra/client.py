@@ -1,24 +1,27 @@
 
+import asyncio
+
 from .v4protocol import V4Protocol
 from .exceptions import MaximumStreamsException, InternalDriverError
-
 
 class Client:
     def __init__(self):
         self._proto = V4Protocol()
         self._streams = {}
         self._last_stream_id = None
+        self._reader = None
+        self._writer = None
 
     @property
     def protocol(self):
         return self._proto
 
-    def closestreamid(self, stream_id):
+    def _rm_stream_id(self, stream_id):
         if stream_id not in self._streams:
             raise InternalDriverError(f"stream_id={stream_id} is not open", stream_id=stream_id)
         del self._streams[stream_id]
         
-    def newstreamid(self):
+    def _new_stream_id(self):
         maxstream = 2**15
         last_id = self._last_stream_id
         if last_id is None:
@@ -41,7 +44,35 @@ class Client:
         return next_id
 
 
+    async def connect(self):
+        self._reader, self._writer = await asyncio.open_connection(*default_host())
+        send = self.protocol.startup(stream_id=self._new_stream_id())
+        self._writer.write(send)
+        head = await self._reader.read(9)
+        version, flags, stream, opcode, length = self.protocol.decode(head)
+        body = await self._reader.read(length)
+        self._rm_stream_id(stream)
+        self.protocol.decode_body(body)
 
+    async def close(self):
+        self._writer.close()
+        await self._writer.wait_closed()
+       
+    async def query(self, query):
+        send = self.protocol.query(query, stream_id=self._new_stream_id())
+        self._writer.write(send)
+        head = await self._reader.read(9)
+        version, flags, stream, opcode, length = self.protocol.decode(head)
+        body = await self._reader.read(length)
+        self._rm_stream_id(stream)
+    
+        text = self.protocol.decode_body(body)
+        print(text)
+        return []
+     
+
+def default_host():
+    return '127.0.0.1', 9042
 
 
 

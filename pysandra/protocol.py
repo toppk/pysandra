@@ -1,5 +1,6 @@
 
 from enum import Enum
+from .exceptions import TypeViolation
 
 # https://github.com/apache/cassandra/blob/trunk/doc/native_protocol_v4.spec
 
@@ -61,15 +62,18 @@ NETWORK_ORDER = "!"
 class Types(str, Enum):
     NetOrder = "!"
     INT = "l"
-    UINT = "l"
     LONG = "q"
-    SHORT = "h"
+    SHORT = "H"
     BYTE = "B"
 
     def String(text):
         if not isinstance(text, bytes):
-            return ValueError("should be bytes")
-        return f"{len(text)}s"
+            return TypeViolation("should be bytes")
+        return f"{Types.SHORT}{len(text)}s"
+    def LongString(text):
+        if not isinstance(text, bytes):
+            return TypeViolation("should be bytes")
+        return f"{Types.INT}{len(text)}s"
 
 
 class Protocol:

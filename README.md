@@ -1,10 +1,19 @@
 ## Goals
 
-* cassandra client driver for asyncio based applications.
+* cassandra client driver for asyncio based applications
+* correct
 * fast
 * efficient
 
+## Implementation
 
+Currently targeting python 3.6 and above
+
+## Todos
+
+* Tests
+* TLS
+* AUTH
 
 
 ## License

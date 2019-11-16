@@ -40,6 +40,7 @@ class Options(str, Enum):
 
 CQL_VERSION= "3.0.0"
 
+SERVER_SENT = 0x80
     
 class Consitency(int, Enum):
     ANY = 0x0000
@@ -53,4 +54,6 @@ class Consitency(int, Enum):
     SERIAL = 0x0008
     LOCAL_SERIAL = 0x0009
     LOCAL_ONE = 0x000A
-    
+
+class Flags(int, Enum):
+     SKIP_METADATA = 0x02
