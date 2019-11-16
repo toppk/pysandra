@@ -1,7 +1,7 @@
 # https://github.com/apache/cassandra/blob/trunk/doc/native_protocol_v4.spec
 from enum import Enum
 
-class opcode(int, Enum):
+class Opcode(int, Enum):
      ERROR = 0x00
      STARTUP = 0x01
      READY = 0x02                
@@ -19,7 +19,7 @@ class opcode(int, Enum):
      AUTH_RESPONSE = 0x0F
      AUTH_SUCCESS = 0x10
 
-class op_result_kind(int, Enum):
+class Op_result_kind(int, Enum):
     Void = 0x0001
     Rows = 0x0002
     Set_keyspace = 0x0003
@@ -27,12 +27,12 @@ class op_result_kind(int, Enum):
     Schema_change = 0x0005
 
 
-class events(str, Enum):
+class Events(str, Enum):
     TOPOLOGY_CHANGE = "TOPOLOGY_CHANGE"
     STATUS_CHANGE = "STATUS_CHANGE"
     SCHEMA_CHANGE = "SCHEMA_CHANGE"
 
-class options(str, Enum):
+class Options(str, Enum):
     CQL_VERSION = "CQL_VERSION"
     COMPRESSION = "COMPRESSION"
     NO_COMPACT = "NO_COMPACT"
@@ -41,7 +41,7 @@ class options(str, Enum):
 CQL_VERSION= "3.0.0"
 
     
-class consitency(int, Enum):
+class Consitency(int, Enum):
     ANY = 0x0000
     ONE = 0x0001
     TWO = 0x0002
