@@ -1,78 +1,70 @@
 
 import asyncio
 
+from .dispatcher import Dispatcher
 from .v4protocol import V4Protocol
-from .exceptions import MaximumStreamsException, InternalDriverError
+from .constants import STARTUP_TIMEOUT, REQUEST_TIMEOUT
+from .exceptions import MaximumStreamsException, InternalDriverError, StartupTimeout, RequestTimeout
+from .utils import get_logger
+
+logger = get_logger(__name__)
 
 class Client:
     def __init__(self):
         self._proto = V4Protocol()
-        self._streams = {}
-        self._last_stream_id = None
-        self._reader = None
-        self._writer = None
+        self._dispatcher = Dispatcher(**default_host(), protocol=self._proto)
+        self._is_ready = False
+        self._in_startup = False
+        self._is_ready_event = asyncio.Event()
+
 
     @property
     def protocol(self):
         return self._proto
 
-    def _rm_stream_id(self, stream_id):
-        if stream_id not in self._streams:
-            raise InternalDriverError(f"stream_id={stream_id} is not open", stream_id=stream_id)
-        del self._streams[stream_id]
-        
-    def _new_stream_id(self):
-        maxstream = 2**15
-        last_id = self._last_stream_id
-        if last_id is None:
-            next_id = 0x00
-        elif len(self._streams) > maxstream:
-            raise MaximumStreamsException
-        else:
-            next_id = last_id + 1
-            while True:
-                if next_id > maxstream:
-                    next_id = 0x00
-                if next_id not in self._streams:
-                    break
-                #print("cannot use %s" % next_id)
-                next_id = next_id + 1
-        if next_id is None:
-            raise InternalDriverError("next_id cannot be None")
-        self._streams[next_id] = True
-        self._last_stream_id = next_id
-        return next_id
+    async def is_ready(self):
+        if not self._is_ready:
+            await self._startup()
+            try:
+                await asyncio.wait_for(self._is_ready_event.wait(), timeout=STARTUP_TIMEOUT)
+            except asyncio.TimeoutError as e:
+                raise StartupTimeout(e) from None
+        return True
 
 
-    async def connect(self):
-        self._reader, self._writer = await asyncio.open_connection(*default_host())
-        send = self.protocol.startup(stream_id=self._new_stream_id())
-        self._writer.write(send)
-        head = await self._reader.read(9)
-        version, flags, stream, opcode, length = self.protocol.decode(head)
-        body = await self._reader.read(length)
-        self._rm_stream_id(stream)
-        self.protocol.decode_body(body)
+    async def _startup(self):
+        if self._in_startup:
+            return
+        self._in_startup = True
+        logger.debug(" in _startup")
+        event = await self._dispatcher.send(self.protocol.startup, self.protocol.startup_response)
+        try: 
+            await asyncio.wait_for(event.wait(), timeout=REQUEST_TIMEOUT)
+        except asyncio.TimeoutError as e:
+                raise RequestTimeout(e) from None
+            
+        is_ready = self._dispatcher.retrieve(event)
+        logger.debug(f"startup is_ready={is_ready}")
+        if is_ready:
+            self._is_ready_event.set()
+       
 
     async def close(self):
-        self._writer.close()
-        await self._writer.wait_closed()
+        await self._dispatcher.close()
        
     async def query(self, query):
-        send = self.protocol.query(query, stream_id=self._new_stream_id())
-        self._writer.write(send)
-        head = await self._reader.read(9)
-        version, flags, stream, opcode, length = self.protocol.decode(head)
-        body = await self._reader.read(length)
-        self._rm_stream_id(stream)
-    
-        text = self.protocol.decode_body(body)
-        print(text)
-        return []
-     
+        await self.is_ready()
+        event = await self._dispatcher.send(self.protocol.query, self.protocol.query_response, request_args=[query])
+        try: 
+            await asyncio.wait_for(event.wait(), timeout=REQUEST_TIMEOUT)
+            return self._dispatcher.retrieve(event)
+        except asyncio.TimeoutError as e:
+                raise RequestTimeout(e) from None
+
 
 def default_host():
-    return '127.0.0.1', 9042
+    return {"host": '127.0.0.1',
+            "port": 9042}
 
 
 

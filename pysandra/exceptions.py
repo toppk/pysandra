@@ -1,21 +1,25 @@
 
 
 class DriverError(Exception):
-    pass
+    def __init__(self, *args, **kwargs):
+        self._kw_args = kwargs
+        self._args = args
 
 ## bugs
 
 class InternalDriverError(DriverError):
-    def __init__(self, *args, **kwargs):
-        self._kw_args = kwargs
-        self._args = args
+    pass
+
+class StartupTimeout(InternalDriverError):
+    pass
+
+class RequestTimeout(InternalDriverError):
+    pass
 
 
 ## user errors
 class UsageException(DriverError):
-    def __init__(self, *args, **kwargs):
-        self._kw_args = kwargs
-        self._args = args
+    pass
 
 class MaximumStreamsException(UsageException):
     pass
@@ -24,12 +28,9 @@ class TypeViolation(UsageException):
     pass
 
 
-
 ## server errors
 class ServerError(DriverError):
-    def __init__(self, *args, **kwargs):
-        self._kw_args = kwargs
-        self._args = args
+    pass
 
 class VersionMismatchException(DriverError):
     pass

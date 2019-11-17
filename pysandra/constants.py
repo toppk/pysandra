@@ -1,6 +1,17 @@
 # https://github.com/apache/cassandra/blob/trunk/doc/native_protocol_v4.spec
 from enum import Enum
 
+## driver
+
+# in seconds
+STARTUP_TIMEOUT = 10
+REQUEST_TIMEOUT = 10
+
+## wire protocol
+
+CQL_VERSION= "3.0.0"
+SERVER_SENT = 0x80
+
 class Opcode(int, Enum):
      ERROR = 0x00
      STARTUP = 0x01
@@ -37,10 +48,6 @@ class Options(str, Enum):
     COMPRESSION = "COMPRESSION"
     NO_COMPACT = "NO_COMPACT"
     THROW_ON_OVERLOAD = "THROW_ON_OVERLOAD"
-
-CQL_VERSION= "3.0.0"
-
-SERVER_SENT = 0x80
     
 class Consitency(int, Enum):
     ANY = 0x0000

@@ -2,14 +2,14 @@
 
 import asyncio
 
-from pysandra.client import Client
+from pysandra import Client
 
 
 async def tcp_cassandra_client():
 
     client = Client()
 
-    await client.connect()
+    #await client.connect()
 
     rows = await client.query("SELECT * FROM uprofile.user where user_id=1")
     for row in rows:
