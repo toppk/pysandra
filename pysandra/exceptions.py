@@ -32,5 +32,14 @@ class TypeViolation(UsageException):
 class ServerError(DriverError):
     pass
 
-class VersionMismatchException(DriverError):
+class VersionMismatchException(ServerError):
     pass
+
+class ProtocolException(ServerError):
+    """
+    Data violates the contracts in the specification
+    """
+class UnknownPayloadException(ServerError):
+    """
+    Data doesn't follow the datagrams specification
+    """

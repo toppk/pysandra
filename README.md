@@ -14,6 +14,7 @@ Currently targeting python 3.6 and above
 * Tests
 * TLS
 * AUTH
+* typing
 
 
 ## License

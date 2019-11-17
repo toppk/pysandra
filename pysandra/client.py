@@ -37,7 +37,7 @@ class Client:
             return
         self._in_startup = True
         logger.debug(" in _startup")
-        event = await self._dispatcher.send(self.protocol.startup, self.protocol.startup_response)
+        event = await self._dispatcher.send(self.protocol.startup, self.protocol.build_response)
         try: 
             await asyncio.wait_for(event.wait(), timeout=REQUEST_TIMEOUT)
         except asyncio.TimeoutError as e:
@@ -54,7 +54,7 @@ class Client:
        
     async def query(self, query):
         await self.is_ready()
-        event = await self._dispatcher.send(self.protocol.query, self.protocol.query_response, params={'query': query})
+        event = await self._dispatcher.send(self.protocol.query, self.protocol.build_response, params={'query': query})
         try: 
             await asyncio.wait_for(event.wait(), timeout=REQUEST_TIMEOUT)
             return self._dispatcher.retrieve(event)

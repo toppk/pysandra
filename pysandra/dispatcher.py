@@ -1,4 +1,6 @@
 import asyncio
+import traceback
+import sys
 
 from .utils import get_logger
 
@@ -16,6 +18,7 @@ class Dispatcher:
         self._streams = {}
         self._last_stream_id = None
         self._connected = False
+        self._running = False
 
     def _rm_stream_id(self, stream_id):
         try:
@@ -23,7 +26,7 @@ class Dispatcher:
         except KeyError:
             raise InternalDriverError(f"stream_id={stream_id} is not open", stream_id=stream_id)
         
-    def _new_stream_id(self, response):
+    def _new_stream_id(self):
         maxstream = 2**15
         last_id = self._last_stream_id
         if last_id is None:
@@ -41,18 +44,27 @@ class Dispatcher:
                 next_id = next_id + 1
         if next_id is None:
             raise InternalDriverError("next_id cannot be None")
-        event = asyncio.Event()
-        self._streams[next_id] = (response, event)
+        # store will come in later
+        self._streams[next_id] = None
         self._last_stream_id = next_id
-        return next_id, event
+        return next_id
 
-    async def send(self, request, response, params=None):
+    def _update_stream_id(self, stream_id, store):
+        if stream_id not in self._streams:
+            raise InternalDriverError(f"stream_id={stream_id} not being tracked")
+        if store is None:
+            raise InternalDriverError("cannot store empty request")
+        self._streams[stream_id] = store
+
+    async def send(self, request_handler, response_handler, params=None):
         if not self._connected:
             await self._connect()
 
-        stream_id, event = self._new_stream_id(response)
-        send = request(stream_id=stream_id, params=params)
-        self._writer.write(send)
+        stream_id = self._new_stream_id()
+        request = request_handler(stream_id=stream_id, params=params)
+        event = asyncio.Event()
+        self._update_stream_id(stream_id, (request, response_handler, event))
+        self._writer.write(request.to_bytes())
         return event
  
 
@@ -61,8 +73,8 @@ class Dispatcher:
         logger.debug(f"in _receive head={head}")
         version, flags, stream, opcode, length = self._proto.decode_header(head)
         body = await self._reader.read(length)
-        response, event = self._rm_stream_id(stream)
-        data = response(version, flags, stream, opcode, length, body)
+        request, response_handler, event = self._rm_stream_id(stream)
+        data = response_handler(request, version, flags, stream, opcode, length, body)
         self._data[event] = data
         event.set()
 
@@ -73,8 +85,16 @@ class Dispatcher:
             raise InternalDriverError(f"missing data for event={event}")
 
     async def _listener(self):
-        while self._connected:
-            await self._receive()
+        self._running = True
+        try:
+            while self._connected:
+                await self._receive()
+        except asyncio.CancelledError as e:
+            if self._running:
+                raise(e)
+        except:
+            traceback.print_exc(file=sys.stdout)
+
             
     async def _connect(self):
         self._reader, self._writer = await asyncio.open_connection(self._host, self._port)
@@ -84,6 +104,7 @@ class Dispatcher:
     async def close(self):
         self._writer.close()
         self._connected = False
+        self._running = False
         self._read_task.cancel()
         await self._writer.wait_closed()
   
