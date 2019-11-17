@@ -1,4 +1,3 @@
-
 from struct import pack, unpack, Struct
 from enum import Enum
 from .exceptions import TypeViolation
@@ -64,6 +63,7 @@ logger = get_logger(__name__)
 
 NETWORK_ORDER = "!"
 
+
 class Types(str, Enum):
     NetOrder = "!"
     INT = "l"
@@ -75,6 +75,7 @@ class Types(str, Enum):
         if not isinstance(text, bytes):
             return TypeViolation("should be bytes")
         return f"{Types.SHORT}{len(text)}s"
+
     def LongString(text):
         if not isinstance(text, bytes):
             return TypeViolation("should be bytes")
@@ -83,13 +84,16 @@ class Types(str, Enum):
 
 structs = None
 
+
 def get_struct(fmt):
     global structs
     if structs is None:
         structs = {}
-        formats = [f"{NETWORK_ORDER}{Types.SHORT}",
-                   f"{NETWORK_ORDER}{Types.BYTE}{Types.BYTE}{Types.SHORT}{Types.BYTE}{Types.INT}",
-                   f"{NETWORK_ORDER}{Types.SHORT}{Types.BYTE}"]
+        formats = [
+            f"{NETWORK_ORDER}{Types.SHORT}",
+            f"{NETWORK_ORDER}{Types.BYTE}{Types.BYTE}{Types.SHORT}{Types.BYTE}{Types.INT}",
+            f"{NETWORK_ORDER}{Types.SHORT}{Types.BYTE}",
+        ]
         for frmt in formats:
             structs[frmt] = Struct(frmt)
     if fmt not in structs:
@@ -105,6 +109,7 @@ class BaseMessage:
     def __init__(self):
         pass
 
+
 class RequestMessage(BaseMessage):
     def __init__(self, version=None, flags=None, stream_id=None):
         self.version = version
@@ -114,15 +119,19 @@ class RequestMessage(BaseMessage):
     def _header_bytes(self, body, stream_id=None):
         if stream_id is None:
             stream_id = self.stream_id
-        return get_struct(f"{NETWORK_ORDER}{Types.BYTE}{Types.BYTE}{Types.SHORT}{Types.BYTE}{Types.INT}").pack(self.version, self.flags, stream_id, self.opcode, len(body))
+        return get_struct(
+            f"{NETWORK_ORDER}{Types.BYTE}{Types.BYTE}{Types.SHORT}{Types.BYTE}{Types.INT}"
+        ).pack(self.version, self.flags, stream_id, self.opcode, len(body))
 
 
 class ResponseMessage(BaseMessage):
     def __init__(self):
         pass
 
+
 class ReadyResponse(ResponseMessage):
     opcode = Opcode.READY
+
     def __init__(self, version=None, flags=None):
         self.version = version
         self.flags = flags
@@ -132,8 +141,10 @@ class ReadyResponse(ResponseMessage):
         msg = ReadyResponse(version=version, flags=flags)
         return msg
 
+
 class ResultResponse(ResponseMessage):
     opcode = Opcode.RESULT
+
     def __init__(self, version=None, flags=None, body=None):
         self.version = version
         self.flags = flags
@@ -147,6 +158,7 @@ class ResultResponse(ResponseMessage):
 
 class StartupRequest(RequestMessage):
     opcode = Opcode.STARTUP
+
     def __init__(self, options=None, **kwargs):
         super().__init__(**kwargs)
         self.options = options
@@ -154,12 +166,22 @@ class StartupRequest(RequestMessage):
     def to_bytes(self, stream_id=None):
         if stream_id is None:
             stream_id = self.stream_id
-        startup_body = get_struct(f"{NETWORK_ORDER}{Types.SHORT}").pack(len(self.options))
+        startup_body = get_struct(f"{NETWORK_ORDER}{Types.SHORT}").pack(
+            len(self.options)
+        )
         for key, value in self.options.items():
-            key_bytes = key.encode('utf-8')
-            value_bytes = value.encode('utf-8')
-            startup_body += pack(f"{NETWORK_ORDER}{Types.String(key_bytes)}{Types.String(value_bytes)}", len(key_bytes), key_bytes, len(value_bytes), value_bytes)
-        test = get_struct(f"{NETWORK_ORDER}{Types.BYTE}{Types.BYTE}{Types.SHORT}{Types.BYTE}{Types.INT}")
+            key_bytes = key.encode("utf-8")
+            value_bytes = value.encode("utf-8")
+            startup_body += pack(
+                f"{NETWORK_ORDER}{Types.String(key_bytes)}{Types.String(value_bytes)}",
+                len(key_bytes),
+                key_bytes,
+                len(value_bytes),
+                value_bytes,
+            )
+        test = get_struct(
+            f"{NETWORK_ORDER}{Types.BYTE}{Types.BYTE}{Types.SHORT}{Types.BYTE}{Types.INT}"
+        )
         startup_head = self._header_bytes(startup_body, stream_id=stream_id)
         startup_send = startup_head + startup_body
         logger.debug(f"msg={startup_send}")
@@ -176,11 +198,15 @@ class QueryRequest(RequestMessage):
     def to_bytes(self, stream_id=None):
         if stream_id is None:
             stream_id = self.stream_id
-        query = self.query.encode('utf-8')
-        query_body = pack(f"{NETWORK_ORDER}{Types.LongString(query)}", len(query), query)
+        query = self.query.encode("utf-8")
+        query_body = pack(
+            f"{NETWORK_ORDER}{Types.LongString(query)}", len(query), query
+        )
         #   <consistency><flags>[<n>[name_1]<value_1>...[name_n]<value_n>][<result_page_size>][<paging_state>][<serial_consistency>][<timestamp>][<keyspace>][<now_in_seconds>]
-        query_body += get_struct(f"{NETWORK_ORDER}{Types.SHORT}{Types.BYTE}").pack(Consitency.ONE, Flags.SKIP_METADATA)
-        #query_body += pack("!HL", Consitency.ONE, 0x0002)
+        query_body += get_struct(f"{NETWORK_ORDER}{Types.SHORT}{Types.BYTE}").pack(
+            Consitency.ONE, Flags.SKIP_METADATA
+        )
+        # query_body += pack("!HL", Consitency.ONE, 0x0002)
         query_head = self._header_bytes(query_body, stream_id)
         query_send = query_head + query_body
         logger.debug(f"msg={query_send}")

@@ -5,6 +5,7 @@ import typing
 
 _LOGGER_INITIALIZED = False
 
+
 def get_logger(name: str) -> logging.Logger:
     """
     Get a `logging.Logger` instance, and optionally

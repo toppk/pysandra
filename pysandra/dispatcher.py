@@ -24,10 +24,12 @@ class Dispatcher:
         try:
             return self._streams.pop(stream_id)
         except KeyError:
-            raise InternalDriverError(f"stream_id={stream_id} is not open", stream_id=stream_id)
-        
+            raise InternalDriverError(
+                f"stream_id={stream_id} is not open", stream_id=stream_id
+            )
+
     def _new_stream_id(self):
-        maxstream = 2**15
+        maxstream = 2 ** 15
         last_id = self._last_stream_id
         if last_id is None:
             next_id = 0x00
@@ -40,7 +42,7 @@ class Dispatcher:
                     next_id = 0x00
                 if next_id not in self._streams:
                     break
-                #print("cannot use %s" % next_id)
+                # print("cannot use %s" % next_id)
                 next_id = next_id + 1
         if next_id is None:
             raise InternalDriverError("next_id cannot be None")
@@ -66,7 +68,6 @@ class Dispatcher:
         self._update_stream_id(stream_id, (request, response_handler, event))
         self._writer.write(request.to_bytes())
         return event
- 
 
     async def _receive(self):
         head = await self._reader.read(9)
@@ -91,13 +92,14 @@ class Dispatcher:
                 await self._receive()
         except asyncio.CancelledError as e:
             if self._running:
-                raise(e)
+                raise (e)
         except:
             traceback.print_exc(file=sys.stdout)
 
-            
     async def _connect(self):
-        self._reader, self._writer = await asyncio.open_connection(self._host, self._port)
+        self._reader, self._writer = await asyncio.open_connection(
+            self._host, self._port
+        )
         self._connected = True
         self._read_task = asyncio.create_task(self._listener())
 
@@ -107,4 +109,3 @@ class Dispatcher:
         self._running = False
         self._read_task.cancel()
         await self._writer.wait_closed()
-  
