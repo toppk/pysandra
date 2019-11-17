@@ -46,12 +46,12 @@ class Dispatcher:
         self._last_stream_id = next_id
         return next_id, event
 
-    async def send(self, request, response, request_args=[]):
+    async def send(self, request, response, params=None):
         if not self._connected:
             await self._connect()
 
         stream_id, event = self._new_stream_id(response)
-        send = request(*request_args, stream_id=stream_id)
+        send = request(stream_id=stream_id, params=params)
         self._writer.write(send)
         return event
  

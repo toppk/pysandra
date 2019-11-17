@@ -54,7 +54,7 @@ class Client:
        
     async def query(self, query):
         await self.is_ready()
-        event = await self._dispatcher.send(self.protocol.query, self.protocol.query_response, request_args=[query])
+        event = await self._dispatcher.send(self.protocol.query, self.protocol.query_response, params={'query': query})
         try: 
             await asyncio.wait_for(event.wait(), timeout=REQUEST_TIMEOUT)
             return self._dispatcher.retrieve(event)
