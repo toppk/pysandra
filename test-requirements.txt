@@ -1,7 +1,7 @@
 -e .
 
 # Optional
-python-snappy
+#python-snappy
 lz4
 
 flake8
