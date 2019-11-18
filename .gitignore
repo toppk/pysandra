@@ -7,3 +7,5 @@ pysandra.egg-info/
 .mypy_cache/
 site/
 .coverage
+build/
+dist/

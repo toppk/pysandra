@@ -10,9 +10,9 @@ __all__ = [
 ]
 
 __title__ = "pysandra"
-__description__ = "Python driver for Cassandra focusing on asyncio users."
+__description__ = "Python driver for Cassandra focusing on asyncio users (INCOMPLETE)."
 __uri__ = "https://github.com/toppk/pysandra"
-__version__ = "0.2.1"
+__version__ = "0.2.2"
 __author__ = "Kenneth Topp"
 __email__ = "toppk@bllue.org"
 __license__ = "MIT or Apache License, Version 2.0"
