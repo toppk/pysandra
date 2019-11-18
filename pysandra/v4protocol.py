@@ -8,6 +8,8 @@ from .protocol import (
     QueryRequest,
     get_struct,
     ResultResponse,
+    RowsResultResponse,
+    VoidResultResponse,
 )
 from .exceptions import (
     VersionMismatchException,
@@ -43,7 +45,6 @@ class V4Protocol(Protocol):
         )
 
     def build_response(self, request, version, flags, stream, opcode, length, body):
-        print(request)
         response = None
         if opcode == Opcode.ERROR:
             pass
@@ -77,8 +78,10 @@ class V4Protocol(Protocol):
                 return True
         elif request.opcode == Opcode.QUERY:
             if response.opcode == Opcode.RESULT:
-                logger.debug(f"body={response.body}")
-                return response.rows
+                if isinstance(response, VoidResultResponse):
+                    return True
+                elif isinstance(response, RowsResultResponse):
+                    return response.rows
         raise InternalDriverError(f"unhandled response={reponse} for request={request}")
 
     def query(self, stream_id=None, params=None):

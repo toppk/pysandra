@@ -58,10 +58,10 @@ class Client:
     async def close(self):
         await self._dispatcher.close()
 
-    async def query(self, query):
+    async def execute(self, stmt, args=None):
         await self.is_ready()
         event = await self._dispatcher.send(
-            self.protocol.query, self.protocol.build_response, params={"query": query}
+            self.protocol.query, self.protocol.build_response, params={"query": stmt}
         )
         try:
             await asyncio.wait_for(event.wait(), timeout=REQUEST_TIMEOUT)

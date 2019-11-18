@@ -82,3 +82,17 @@ class Flags(int, Enum):
     TRACING = 0x02
     CUSTOM_PAYLOAD = 0x04
     WARNING = 0x08
+
+
+class SchemaChangeType(str, Enum):
+    CREATED = "CREATED"
+    UPDATED = "UPDATED"
+    DROPPED = "DROPPED"
+
+
+class SchemaChangeTarget(str, Enum):
+    KEYSPACE = "KEYSPACE"
+    TABLE = "TABLE"
+    TYPE = "TYPE"
+    FUNCTION = "FUNCTION"
+    AGGREGATE = "AGGREGATE"

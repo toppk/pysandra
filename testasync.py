@@ -11,9 +11,16 @@ async def tcp_cassandra_client():
 
     #await client.connect()
 
-    rows = await client.query("SELECT * FROM uprofile.user where user_id=1")
+    status = await client.execute("CREATE KEYSPACE IF NOT EXISTS uprofile WITH replication = {'class': 'NetworkTopologyStrategy', 'datacenter1' : '1' }")
+    print(f"got status={status}")
+    status = await client.execute("CREATE TABLE IF NOT EXISTS uprofile.user (user_id int , user_name text, user_bcity text, PRIMARY KEY( user_id, user_name))");
+    print(f"got status={status}")
+    rows = await client.execute("SELECT release_version FROM system.local")
     for row in rows:
-        print("got %s" % row)
+        print(f"got row={row}")
+    rows = await client.execute("SELECT * FROM uprofile.user where user_id=1")
+    for row in rows:
+        print(f"got row={row}")
 
     await client.close()
     

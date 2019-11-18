@@ -148,20 +148,18 @@ class ReadyResponse(ResponseMessage):
 class ResultResponse(ResponseMessage):
     opcode = Opcode.RESULT
 
-    def __init__(self, body=None, rows=None, **kwargs):
+    def __init__(self, kind=None, **kwargs):
         super().__init__(**kwargs)
-        self.body = body
-        self.rows = rows
+        self.kind = kind
 
     @staticmethod
     def build(version=None, flags=None, query_flags=None, body=None):
-        msg = ResultResponse(version=version, flags=flags, body=body)
+        msg = None
         body = SBytes(body)
-        logger.debug(f"ResultResponse body={body}")
         kind = unpack(f"{NETWORK_ORDER}{Types.INT}", body.show(4))[0]
-        print(kind)
+        logger.debug(f"ResultResponse kind={kind} body={body}")
         if kind == Kind.VOID:
-            pass
+            msg = VoidResultResponse(version=version, flags=flags, kind=kind)
         elif kind == Kind.ROWS:
             result_flags = unpack(f"{NETWORK_ORDER}{Types.INT}", body.show(4))[0]
             column_count = unpack(f"{NETWORK_ORDER}{Types.INT}", body.show(4))[0]
@@ -187,8 +185,8 @@ class ResultResponse(ResponseMessage):
                 rows.add(
                     unpack(f"{NETWORK_ORDER}{Types.Bytes(length)}", body.show(length))
                 )
+            msg = RowsResultResponse(version=version, flags=flags, kind=kind)
             msg.rows = rows
-            return msg
 
         elif kind == Kind.SET_KEYSPACE:
             pass
@@ -198,7 +196,25 @@ class ResultResponse(ResponseMessage):
             pass
         else:
             raise UnknownPayloadException(f"RESULT message has unknown kind={kind}")
+        if msg is None:
+            raise InternalDriverError(
+                f"ResultResponse no msg generated for body={body}"
+            )
+        if not body.at_end():
+            raise InternalDriverError(
+                f"ResultResponse still data left remains={body.show()}"
+            )
         return msg
+
+
+class RowsResultResponse(ResultResponse):
+    def __init__(self, rows=None, **kwargs):
+        super().__init__(**kwargs)
+        self.rows = rows
+
+
+class VoidResultResponse(ResultResponse):
+    pass
 
 
 class StartupRequest(RequestMessage):
