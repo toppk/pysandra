@@ -75,11 +75,14 @@ class V4Protocol(Protocol):
             raise InternalDriverError(
                 f"missing query_id={query_id} in prepared statements"
             )
+        prepared = self._prepared[query_id]
+        logger.debug(f"have prepared col_specs={prepared.col_specs}")
         return ExecuteMessage(
             version=self.version,
             flags=self.flags(),
             query_id=query_id,
             query_params=params["query_params"],
+            col_specs=prepared.col_specs,
             stream_id=stream_id,
         )
 
@@ -130,6 +133,11 @@ class V4Protocol(Protocol):
                 if isinstance(response, PreparedResultMessage):
                     self._prepared[response.query_id] = response
                     return response.query_id
+        elif request.opcode == Opcode.EXECUTE:
+            if response.opcode == Opcode.RESULT:
+                if isinstance(response, VoidResultMessage):
+                    return True
+
         raise InternalDriverError(
             f"unhandled response={response} for request={request}"
         )

@@ -1,8 +1,21 @@
 from struct import pack, unpack, Struct
 from enum import Enum
-from .exceptions import TypeViolation, UnknownPayloadException, InternalDriverError
+from .exceptions import (
+    TypeViolation,
+    UnknownPayloadException,
+    InternalDriverError,
+    BadInputException,
+)
 from .utils import get_logger, SBytes
-from .constants import Opcode, Consitency, QueryFlags, Flags, Kind, ResultFlags
+from .constants import (
+    Opcode,
+    Consitency,
+    QueryFlags,
+    Flags,
+    Kind,
+    ResultFlags,
+    OptionID,
+)
 from .types import Rows
 
 logger = get_logger(__name__)
@@ -297,6 +310,7 @@ class ResultMessage(ResponseMessage):
                         raise InternalDriverError(
                             f"unhandled option_id={col_spec['option_id']}"
                         )
+                    col_specs.append(col_spec)
             # <result_metadata>
             # <flags>
             result_flags = unpack(f"{NETWORK_ORDER}{Types.INT}", body.show(4))[0]
@@ -387,14 +401,20 @@ class StartupMessage(RequestMessage):
 class ExecuteMessage(RequestMessage):
     opcode = Opcode.EXECUTE
 
-    def __init__(self, query_id=None, query_params=None, **kwargs):
+    def __init__(self, query_id=None, query_params=None, col_specs=None, **kwargs):
         self.query_id = query_id
         self.query_params = query_params
+        self.col_specs = col_specs
         super().__init__(**kwargs)
 
     def to_bytes(self, stream_id=None):
         if stream_id is None:
             stream_id = self.stream_id
+        # data check
+        if len(self.col_specs) != len(self.query_params):
+            raise BadInputException(
+                f" count of execute params={len(query_params)} doesn't match prepared statement count={len(self.col_specs)}"
+            )
         # <id>
         execute_body = pack(
             f"{NETWORK_ORDER}{Types.String(self.query_id)}",
@@ -404,9 +424,27 @@ class ExecuteMessage(RequestMessage):
         ##   <query_parameters>
         #     <consistency><flags>
         execute_body += get_struct(f"{NETWORK_ORDER}{Types.SHORT}{Types.BYTE}").pack(
-            Consitency.ONE, QueryFlags.SKIP_METADATA
+            Consitency.ONE, QueryFlags.VALUES
         )
         #     [<n>[name_1]<value_1>...[name_n]<value_n>][<result_page_size>][<paging_state>][<serial_consistency>][<timestamp>]
+        # <n>
+        execute_body += get_struct(f"{NETWORK_ORDER}{Types.SHORT}").pack(
+            len(self.col_specs)
+        )
+        for value, spec in zip(self.query_params, self.col_specs):
+            if spec["option_id"] == OptionID.INT:
+                execute_body += pack(f"{NETWORK_ORDER}{Types.INT}{Types.INT}", 4, value)
+            elif spec["option_id"] == OptionID.VARCHAR:
+                value_bytes = value.encode("utf-8")
+                execute_body += pack(
+                    f"{NETWORK_ORDER}{Types.LongString(value_bytes)}",
+                    len(value_bytes),
+                    value_bytes,
+                )
+            else:
+                raise InternalDriverError(
+                    f"cannot handle unknown option_id={spec['option_id']}"
+                )
         execute_head = self._header_bytes(execute_body, stream_id)
         msg_bytes = execute_head + execute_body
         logger.debug(f"msg_bytes={msg_bytes}")

@@ -32,6 +32,10 @@ class TypeViolation(UsageException):
     pass
 
 
+class BadInputException(UsageException):
+    pass
+
+
 ## server errors
 class ServerError(DriverError):
     pass

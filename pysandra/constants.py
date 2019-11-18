@@ -102,7 +102,13 @@ class OptionID(int, Enum):
 
 
 class QueryFlags(int, Enum):
+    VALUES = 0x01
     SKIP_METADATA = 0x02
+    PAGE_SIZE = 0x04
+    WITH_PAGING_STATE = 0x08
+    WITH_SERIAL_CONSITENCY = 0x10
+    WITH_DEFAULT_TIMESTAMP = 0x20
+    WITH_NAMES_FOR_VALUES = 0x40
 
 
 class Flags(int, Enum):
