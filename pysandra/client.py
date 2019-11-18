@@ -60,8 +60,35 @@ class Client:
 
     async def execute(self, stmt, args=None):
         await self.is_ready()
+        if args is None:
+            # query
+            event = await self._dispatcher.send(
+                self.protocol.query,
+                self.protocol.build_response,
+                params={"query": stmt},
+            )
+            try:
+                await asyncio.wait_for(event.wait(), timeout=REQUEST_TIMEOUT)
+                return self._dispatcher.retrieve(event)
+            except asyncio.TimeoutError as e:
+                raise RequestTimeout(e) from None
+        else:
+            # execute (prepared statements)
+            event = await self._dispatcher.send(
+                self.protocol.execute,
+                self.protocol.build_response,
+                params={"query_id": stmt, "query_params": args},
+            )
+            try:
+                await asyncio.wait_for(event.wait(), timeout=REQUEST_TIMEOUT)
+                return self._dispatcher.retrieve(event)
+            except asyncio.TimeoutError as e:
+                raise RequestTimeout(e) from None
+
+    async def prepare(self, stmt):
+        await self.is_ready()
         event = await self._dispatcher.send(
-            self.protocol.query, self.protocol.build_response, params={"query": stmt}
+            self.protocol.prepare, self.protocol.build_response, params={"query": stmt}
         )
         try:
             await asyncio.wait_for(event.wait(), timeout=REQUEST_TIMEOUT)

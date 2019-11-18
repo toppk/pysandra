@@ -3,13 +3,16 @@ from .protocol import (
     Protocol,
     NETWORK_ORDER,
     Types,
-    StartupRequest,
-    ReadyResponse,
-    QueryRequest,
     get_struct,
-    ResultResponse,
-    RowsResultResponse,
-    VoidResultResponse,
+    StartupMessage,
+    ReadyMessage,
+    QueryMessage,
+    PrepareMessage,
+    ExecuteMessage,
+    ResultMessage,
+    RowsResultMessage,
+    VoidResultMessage,
+    PreparedResultMessage,
 )
 from .exceptions import (
     VersionMismatchException,
@@ -26,6 +29,10 @@ class V4Protocol(Protocol):
 
     def __init__(self, default_flags=0x00):
         self._default_flags = default_flags
+        self._prepared = {}
+
+    def reset_connection(self):
+        self._prepared = {}
 
     @property
     def options(self):
@@ -37,10 +44,40 @@ class V4Protocol(Protocol):
         return flags
 
     def startup(self, stream_id=None, params=None):
-        return StartupRequest(
+        return StartupMessage(
             version=self.version,
             flags=self.flags(),
             options=self.options,
+            stream_id=stream_id,
+        )
+
+    def query(self, stream_id=None, params=None):
+        return QueryMessage(
+            version=self.version,
+            flags=self.flags(),
+            query=params["query"],
+            stream_id=stream_id,
+        )
+
+    def prepare(self, stream_id=None, params=None):
+        return PrepareMessage(
+            version=self.version,
+            flags=self.flags(),
+            query=params["query"],
+            stream_id=stream_id,
+        )
+
+    def execute(self, stream_id=None, params=None):
+        query_id = params["query_id"]
+        if query_id not in self._prepared:
+            raise InternalDriverError(
+                f"missing query_id={query_id} in prepared statements"
+            )
+        return ExecuteMessage(
+            version=self.version,
+            flags=self.flags(),
+            query_id=query_id,
+            query_params=params["query_params"],
             stream_id=stream_id,
         )
 
@@ -49,13 +86,13 @@ class V4Protocol(Protocol):
         if opcode == Opcode.ERROR:
             pass
         elif opcode == Opcode.READY:
-            response = ReadyResponse.build(version=version, flags=flags, body=body)
+            response = ReadyMessage.build(version=version, flags=flags, body=body)
         elif opcode == Opcode.AUTHENTICATE:
             pass
         elif opcode == Opcode.SUPPORTED:
             pass
         elif opcode == Opcode.RESULT:
-            response = ResultResponse.build(
+            response = ResultMessage.build(
                 version=version, flags=flags, query_flags=request.flags, body=body
             )
         elif opcode == Opcode.EVENT:
@@ -78,18 +115,17 @@ class V4Protocol(Protocol):
                 return True
         elif request.opcode == Opcode.QUERY:
             if response.opcode == Opcode.RESULT:
-                if isinstance(response, VoidResultResponse):
+                if isinstance(response, VoidResultMessage):
                     return True
-                elif isinstance(response, RowsResultResponse):
+                elif isinstance(response, RowsResultMessage):
                     return response.rows
-        raise InternalDriverError(f"unhandled response={reponse} for request={request}")
-
-    def query(self, stream_id=None, params=None):
-        return QueryRequest(
-            version=self.version,
-            flags=self.flags(),
-            query=params["query"],
-            stream_id=stream_id,
+        elif request.opcode == Opcode.PREPARE:
+            if response.opcode == Opcode.RESULT:
+                if isinstance(response, PreparedResultMessage):
+                    self._prepared[response.query_id] = response
+                    return response.query_id
+        raise InternalDriverError(
+            f"unhandled response={response} for request={request}"
         )
 
     def decode_header(self, header):

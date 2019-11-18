@@ -73,6 +73,34 @@ class ResultFlags(int, Enum):
     NO_METADATA = 0x04
 
 
+class OptionID(int, Enum):
+    CUSTOM = 0x0000
+    ASCII = 0x0001
+    BIGINT = 0x0002
+    BLOB = 0x0003
+    BOOLEAN = 0x0004
+    COUNTER = 0x0005
+    DECIMAL = 0x0006
+    DOUBLE = 0x0007
+    FLOAT = 0x0008
+    INT = 0x0009
+    TIMESTAMP = 0x000B
+    UUID = 0x000C
+    VARCHAR = 0x000D
+    VARINT = 0x000E
+    TIMEUUID = 0x000F
+    INET = 0x0010
+    DATE = 0x0011
+    TIME = 0x0012
+    SMALLINT = 0x0013
+    TINYINT = 0x0014
+    LIST = 0x0020
+    MAP = 0x0021
+    SET = 0x0022
+    UDT = 0x0030
+    TUPLE = 0x0031
+
+
 class QueryFlags(int, Enum):
     SKIP_METADATA = 0x02
 

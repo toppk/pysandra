@@ -22,6 +22,13 @@ async def tcp_cassandra_client():
     for row in rows:
         print(f"got row={row}")
 
+    insert = await client.prepare("INSERT INTO  uprofile.user  (user_id, user_name , user_bcity) VALUES (?,?,?)")
+    status = await client.execute(insert, [45,'Trump','Washington D.C.'])
+    print(f"got status={status}")
+    rows = await client.execute("SELECT * FROM uprofile.user where user_id=45")
+    for row in rows:
+        print(f"got row={row}")
+
     await client.close()
     
 
