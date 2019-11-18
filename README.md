@@ -57,7 +57,6 @@ Aims to be:
 * Tests
 * TLS
 * AUTH
-* typing
 
 ## Developing
 
