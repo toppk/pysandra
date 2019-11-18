@@ -1,9 +1,8 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 
 import asyncio
 
 from pysandra import Client
-
 
 async def tcp_cassandra_client():
 
