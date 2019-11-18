@@ -1,8 +1,11 @@
 import asyncio
+from typing import Tuple, Union
 
 from .constants import REQUEST_TIMEOUT, STARTUP_TIMEOUT
 from .dispatcher import Dispatcher
-from .exceptions import MaximumStreamsException, RequestTimeout, StartupTimeout
+from .exceptions import RequestTimeout, StartupTimeout
+from .protocol import Protocol
+from .types import Rows  # noqa: F401
 from .utils import get_logger
 from .v4protocol import V4Protocol
 
@@ -10,18 +13,18 @@ logger = get_logger(__name__)
 
 
 class Client:
-    def __init__(self):
+    def __init__(self) -> None:
         self._proto = V4Protocol()
-        self._dispatcher = Dispatcher(**default_host(), protocol=self._proto)
+        self._dispatcher = Dispatcher(protocol=self._proto, **default_host())
         self._is_ready = False
         self._in_startup = False
         self._is_ready_event = asyncio.Event()
 
     @property
-    def protocol(self):
+    def protocol(self) -> "Protocol":
         return self._proto
 
-    async def is_ready(self):
+    async def is_ready(self) -> bool:
         if not self._is_ready:
             await self._startup()
             try:
@@ -32,7 +35,7 @@ class Client:
                 raise StartupTimeout(e) from None
         return True
 
-    async def _startup(self):
+    async def _startup(self) -> None:
         if self._in_startup:
             return
         self._in_startup = True
@@ -46,14 +49,16 @@ class Client:
             raise RequestTimeout(e) from None
 
         is_ready = self._dispatcher.retrieve(event)
-        logger.debug(f"startup is_ready={is_ready}")
+        logger.debug(f"startup is_ready={is_ready!r}")
         if is_ready:
             self._is_ready_event.set()
 
-    async def close(self):
+    async def close(self) -> None:
         await self._dispatcher.close()
 
-    async def execute(self, stmt, args=None):
+    async def execute(
+        self, stmt: str, args: Tuple = None
+    ) -> Union[bytes, "Rows", bool]:
         await self.is_ready()
         if args is None:
             # query
@@ -80,35 +85,19 @@ class Client:
             except asyncio.TimeoutError as e:
                 raise RequestTimeout(e) from None
 
-    async def prepare(self, stmt):
+    async def prepare(self, stmt: str) -> bytes:
         await self.is_ready()
         event = await self._dispatcher.send(
             self.protocol.prepare, self.protocol.build_response, params={"query": stmt}
         )
         try:
             await asyncio.wait_for(event.wait(), timeout=REQUEST_TIMEOUT)
-            return self._dispatcher.retrieve(event)
+            resp = self._dispatcher.retrieve(event)
+            assert isinstance(resp, bytes)
+            return resp
         except asyncio.TimeoutError as e:
             raise RequestTimeout(e) from None
 
 
-def default_host():
+def default_host() -> dict:
     return {"host": "127.0.0.1", "port": 9042}
-
-
-if __name__ == "__main__":
-
-    client = Client()
-    move = 0
-    while True:
-        move += 1
-        try:
-            streamid = client.newstreamid()
-        except MaximumStreamsException as e:
-            print(len(client._streams))
-            raise e
-        print("got new streamid=%s" % streamid)
-        if (move % 19) == 0:
-
-            print("remove streamid = %s" % streamid)
-            client.closestreamid(streamid)

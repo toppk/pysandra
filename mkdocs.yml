@@ -1,0 +1,22 @@
+site_name: PYSANDRA
+site_description: Python driver for Cassandra focusing on asyncio users.
+
+theme:
+    name: 'material'
+
+repo_name: toppk/pysandra
+repo_url: https://github.com/toppk/pysandra
+edit_uri: ""
+
+nav:
+    - Introduction: 'index.md'
+    - V4 Spec: 'native_protocol_v4.spec'
+    - V5 Spec: 'native_protocol_v5.spec'
+
+markdown_extensions:
+  - admonition
+  - codehilite
+  - mkautodoc
+
+extra_css:
+    - css/custom.css

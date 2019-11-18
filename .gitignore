@@ -5,3 +5,5 @@ venv/
 pip-wheel-metadata/
 pysandra.egg-info/
 .mypy_cache/
+site/
+.coverage

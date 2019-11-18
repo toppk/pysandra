@@ -1,3 +1,5 @@
+from typing import Dict, Optional, Tuple, Union
+
 from .constants import CQL_VERSION, SERVER_SENT, Opcode, Options
 from .exceptions import (
     InternalDriverError,
@@ -14,13 +16,16 @@ from .protocol import (
     Protocol,
     QueryMessage,
     ReadyMessage,
+    RequestMessage,
+    ResponseMessage,
     ResultMessage,
     RowsResultMessage,
     StartupMessage,
-    Types,
+    STypes,
     VoidResultMessage,
     get_struct,
 )
+from .types import Rows  # noqa: F401
 from .utils import get_logger
 
 logger = get_logger(__name__)
@@ -29,23 +34,23 @@ logger = get_logger(__name__)
 class V4Protocol(Protocol):
     version = 0x04
 
-    def __init__(self, default_flags=0x00):
+    def __init__(self, default_flags: int = 0x00) -> None:
         self._default_flags = default_flags
-        self._prepared = {}
+        self._prepared: Dict[bytes, "PreparedResultMessage"] = {}
 
-    def reset_connection(self):
+    def reset_connection(self) -> None:
         self._prepared = {}
 
     @property
-    def options(self):
+    def options(self) -> dict:
         return {Options.CQL_VERSION: CQL_VERSION}
 
-    def flags(self, flags=None):
+    def flags(self, flags: int = None) -> int:
         if flags is None:
             flags = self._default_flags
         return flags
 
-    def startup(self, stream_id=None, params=None):
+    def startup(self, stream_id: int = None, params: dict = None) -> "StartupMessage":
         return StartupMessage(
             version=self.version,
             flags=self.flags(),
@@ -53,7 +58,8 @@ class V4Protocol(Protocol):
             stream_id=stream_id,
         )
 
-    def query(self, stream_id=None, params=None):
+    def query(self, stream_id: int = None, params: dict = None) -> "QueryMessage":
+        assert params is not None
         return QueryMessage(
             version=self.version,
             flags=self.flags(),
@@ -61,7 +67,8 @@ class V4Protocol(Protocol):
             stream_id=stream_id,
         )
 
-    def prepare(self, stream_id=None, params=None):
+    def prepare(self, stream_id: int = None, params: dict = None) -> "PrepareMessage":
+        assert params is not None
         return PrepareMessage(
             version=self.version,
             flags=self.flags(),
@@ -69,7 +76,8 @@ class V4Protocol(Protocol):
             stream_id=stream_id,
         )
 
-    def execute(self, stream_id=None, params=None):
+    def execute(self, stream_id: int = None, params: dict = None) -> "ExecuteMessage":
+        assert params is not None
         query_id = params["query_id"]
         if query_id not in self._prepared:
             raise InternalDriverError(
@@ -86,8 +94,17 @@ class V4Protocol(Protocol):
             stream_id=stream_id,
         )
 
-    def build_response(self, request, version, flags, stream, opcode, length, body):
-        response = None
+    def build_response(
+        self,
+        request: "RequestMessage",
+        version: int,
+        flags: int,
+        stream: int,
+        opcode: int,
+        length: int,
+        body: bytes,
+    ) -> Union[bool, "Rows", bytes]:
+        response: Optional["ResponseMessage"] = None
         if opcode == Opcode.ERROR:
             response = ErrorMessage.build(version=version, flags=flags, body=body)
             raise ServerError(
@@ -118,7 +135,9 @@ class V4Protocol(Protocol):
             )
         return self.respond(request, response)
 
-    def respond(self, request, response):
+    def respond(
+        self, request: "RequestMessage", response: "ResponseMessage"
+    ) -> Union[bool, "Rows", bytes]:
         if request.opcode == Opcode.STARTUP:
             if response.opcode == Opcode.READY:
                 return True
@@ -142,12 +161,12 @@ class V4Protocol(Protocol):
             f"unhandled response={response} for request={request}"
         )
 
-    def decode_header(self, header):
+    def decode_header(self, header: bytes) -> Tuple[int, int, int, int, int]:
         version, flags, stream, opcode, length = get_struct(
-            f"{NETWORK_ORDER}{Types.BYTE}{Types.BYTE}{Types.SHORT}{Types.BYTE}{Types.INT}"
+            f"{NETWORK_ORDER}{STypes.BYTE}{STypes.BYTE}{STypes.SHORT}{STypes.BYTE}{STypes.INT}"
         ).unpack(header)
         logger.debug(
-            f"got head={header} containing version={version:x} flags={flags:x} stream={stream:x} opcode={opcode:x} length={length:x}"
+            f"got head={header!r} containing version={version:x} flags={flags:x} stream={stream:x} opcode={opcode:x} length={length:x}"
         )
         expected_version = SERVER_SENT | self.version
         if version != expected_version:
@@ -155,7 +174,3 @@ class V4Protocol(Protocol):
                 f"received version={version:x} instead of expected_version={expected_version}"
             )
         return version, flags, stream, opcode, length
-
-    def decode_body(self, body):
-        logger.debug(f"body={body}")
-        return body.decode("utf-8")

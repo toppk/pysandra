@@ -1,6 +1,7 @@
 import logging
 import os
 import sys
+from typing import Optional, Type, cast
 
 _LOGGER_INITIALIZED = False
 
@@ -32,32 +33,33 @@ def get_logger(name: str) -> logging.Logger:
 
 
 class SBytes(bytes):
-    index = 0
+    my_index: Optional[int] = 0
 
-    def __new__(cls, val):
-        return super(SBytes, cls).__new__(cls, val)
+    def __new__(cls: Type[bytes], val: bytes) -> "SBytes":
+        return cast(SBytes, super().__new__(cls, val))  # type: ignore # https://github.com/python/typeshed/issues/2630
 
-    def hex(self):
+    def hex(self) -> str:
         return "0x" + super().hex()
 
-    def show(self, count=None):
+    def show(self, count: Optional[int] = None) -> bytes:
+        assert self.my_index is not None
         if count is None:
-            curindex = self.index
-            self.index = len(self)
+            curindex = self.my_index
+            self.my_index = len(self)
             return self[curindex:]
 
-        if self.index + count > len(self):
+        if self.my_index + count > len(self):
             raise IndexError(f"cannot go beyond {len(self)}")
-        curindex = self.index
-        self.index += count
+        curindex = self.my_index
+        self.my_index += count
         return self[curindex : curindex + count]
 
-    def at_end(self):
-        return self.index == len(self)
+    def at_end(self) -> bool:
+        return self.my_index == len(self)
 
 
 if __name__ == "__main__":
     t = SBytes(b"12345")
-    print(f"{t.show(1)}{t.at_end()}")
-    print(f"{t.show(3)}{t.at_end()}")
-    print(f"{t.show(2)}{t.at_end()}")
+    print(f"{t.show(1)!r}{t.at_end()}")
+    print(f"{t.show(3)!r}{t.at_end()}")
+    print(f"{t.show(2)!r}{t.at_end()}")

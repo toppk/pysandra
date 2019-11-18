@@ -1,35 +1,48 @@
 import asyncio
 import sys
 import traceback
+from typing import Callable, Dict, Optional, Tuple, Union
 
 from .exceptions import InternalDriverError, MaximumStreamsException
+from .protocol import Protocol, RequestMessage  # noqa: F401
+from .types import Rows  # noqa: F401
 from .utils import get_logger
 
 logger = get_logger(__name__)
 
 
 class Dispatcher:
-    def __init__(self, host=None, port=None, protocol=None):
+    _writer: "asyncio.StreamWriter"
+    _reader: "asyncio.StreamReader"
+
+    def __init__(
+        self, host: str = None, port: int = None, protocol: "Protocol" = None
+    ) -> None:
         self._host = host
         self._port = port
+        assert protocol is not None
         self._proto = protocol
-        self._reader = None
-        self._data = {}
-        self._writer = None
-        self._streams = {}
-        self._last_stream_id = None
+        self._data: Dict["asyncio.Event", Union[bytes, "Rows", bool]] = {}
+        self._streams: Dict[
+            int, Optional[Tuple["RequestMessage", Callable, asyncio.Event]]
+        ] = {}
         self._connected = False
         self._running = False
+        self._last_stream_id: Optional[int] = None
 
-    def _rm_stream_id(self, stream_id):
+    def _rm_stream_id(
+        self, stream_id: int
+    ) -> Tuple["RequestMessage", Callable, asyncio.Event]:
         try:
-            return self._streams.pop(stream_id)
+            store = self._streams.pop(stream_id)
+            assert store is not None
+            return store
         except KeyError:
             raise InternalDriverError(
                 f"stream_id={stream_id} is not open", stream_id=stream_id
             )
 
-    def _new_stream_id(self):
+    def _new_stream_id(self) -> int:
         maxstream = 2 ** 15
         last_id = self._last_stream_id
         if last_id is None:
@@ -52,14 +65,18 @@ class Dispatcher:
         self._last_stream_id = next_id
         return next_id
 
-    def _update_stream_id(self, stream_id, store):
+    def _update_stream_id(
+        self, stream_id: int, store: Tuple["RequestMessage", Callable, asyncio.Event]
+    ) -> None:
         if stream_id not in self._streams:
             raise InternalDriverError(f"stream_id={stream_id} not being tracked")
         if store is None:
             raise InternalDriverError("cannot store empty request")
         self._streams[stream_id] = store
 
-    async def send(self, request_handler, response_handler, params=None):
+    async def send(
+        self, request_handler: Callable, response_handler: Callable, params: dict = None
+    ) -> "asyncio.Event":
         if not self._connected:
             await self._connect()
 
@@ -70,9 +87,9 @@ class Dispatcher:
         self._writer.write(request.to_bytes())
         return event
 
-    async def _receive(self):
+    async def _receive(self) -> None:
         head = await self._reader.read(9)
-        logger.debug(f"in _receive head={head}")
+        logger.debug(f"in _receive head={head!r}")
         version, flags, stream, opcode, length = self._proto.decode_header(head)
         body = await self._reader.read(length)
         request, response_handler, event = self._rm_stream_id(stream)
@@ -80,13 +97,14 @@ class Dispatcher:
         self._data[event] = data
         event.set()
 
-    def retrieve(self, event):
+    def retrieve(self, event: "asyncio.Event") -> Union[bytes, "Rows", bool]:
         try:
             return self._data.pop(event)
         except KeyError:
             raise InternalDriverError(f"missing data for event={event}")
 
-    async def _listener(self):
+    # should return typing.NoReturn
+    async def _listener(self) -> None:
         self._running = True
         try:
             while self._connected:
@@ -98,16 +116,36 @@ class Dispatcher:
         except BaseException:
             traceback.print_exc(file=sys.stdout)
 
-    async def _connect(self):
+    async def _connect(self) -> None:
+        assert self._host is not None
+        assert self._port is not None
         self._reader, self._writer = await asyncio.open_connection(
             self._host, self._port
         )
         self._connected = True
         self._read_task = asyncio.create_task(self._listener())
 
-    async def close(self):
+    async def close(self) -> None:
         self._writer.close()
         self._connected = False
         self._running = False
         self._read_task.cancel()
         await self._writer.wait_closed()
+
+
+if __name__ == "__main__":
+
+    client = Dispatcher()
+    move = 0
+    while True:
+        move += 1
+        try:
+            streamid = client._new_stream_id()
+        except MaximumStreamsException as e:
+            print(len(client._streams))
+            raise e
+        print("got new streamid=%s" % streamid)
+        if (move % 19) == 0:
+
+            print("remove streamid = %s" % streamid)
+            client._rm_stream_id(streamid)

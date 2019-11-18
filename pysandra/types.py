@@ -1,28 +1,31 @@
-class Types:
+from typing import List
+
+
+class BaseType:
     pass
 
 
-class UnknownType(Types):
+class UnknownType(BaseType):
     pass
 
 
-class AsciiType(Types):
+class AsciiType(BaseType):
     pass
 
 
 class Rows:
-    def __init__(self, column_count=None):
-        self.index = 0
-        self._data = []
+    def __init__(self, column_count: int) -> None:
+        self.index: int = 0
+        self._data: List[bytes] = []
         self.column_count = column_count
 
-    def __iter__(self):
+    def __iter__(self) -> "Rows":
         return self
 
-    def add(self, cell):
+    def add(self, cell: bytes) -> None:
         self._data.append(cell)
 
-    def __next__(self):
+    def __next__(self) -> List[bytes]:
         if self.index == len(self._data):
             # reset
             self.index = 0
@@ -34,10 +37,10 @@ class Rows:
 
 if __name__ == "__main__":
     d = Rows(column_count=2)
-    d.add("1")
-    d.add("2")
-    d.add("3")
-    d.add("4")
+    d.add(b"1")
+    d.add(b"2")
+    d.add(b"3")
+    d.add(b"4")
     for row in d:
         print(f"got row={row}")
     for row in d:
