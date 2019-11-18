@@ -42,10 +42,6 @@ class V4Protocol(Protocol):
             stream_id=stream_id,
         )
 
-    def startup_response(self, version, flags, stream, opcode, length, body):
-        logger.debug(f"in startup_reponse opcode={opcode}")
-        return opcode == Opcode.READY
-
     def build_response(self, request, version, flags, stream, opcode, length, body):
         print(request)
         response = None
@@ -58,7 +54,9 @@ class V4Protocol(Protocol):
         elif opcode == Opcode.SUPPORTED:
             pass
         elif opcode == Opcode.RESULT:
-            response = ResultResponse.build(version=version, flags=flags, body=body)
+            response = ResultResponse.build(
+                version=version, flags=flags, query_flags=request.flags, body=body
+            )
         elif opcode == Opcode.EVENT:
             pass
         elif opcode == Opcode.AUTH_CHALLENGE:
@@ -80,7 +78,7 @@ class V4Protocol(Protocol):
         elif request.opcode == Opcode.QUERY:
             if response.opcode == Opcode.RESULT:
                 logger.debug(f"body={response.body}")
-                return [response.body.decode("utf-8")]
+                return response.rows
         raise InternalDriverError(f"unhandled response={reponse} for request={request}")
 
     def query(self, stream_id=None, params=None):

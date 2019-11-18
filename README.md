@@ -1,13 +1,18 @@
 ## Goals
 
 * cassandra client driver for asyncio based applications
-* correct
-* fast
-* efficient
+* allow doing anything the wire protocol allows
 
 ## Implementation
 
 Currently targeting python 3.6 and above
+
+Aims to be:
+
+* correct
+* fast
+* efficient
+* developer friendly
 
 ## Todos
 

@@ -32,12 +32,12 @@ class Opcode(int, Enum):
     AUTH_SUCCESS = 0x10
 
 
-class Op_result_kind(int, Enum):
-    Void = 0x0001
-    Rows = 0x0002
-    Set_keyspace = 0x0003
-    Prepared = 0x0004
-    Schema_change = 0x0005
+class Kind(int, Enum):
+    VOID = 0x0001
+    ROWS = 0x0002
+    SET_KEYSPACE = 0x0003
+    PREPARED = 0x0004
+    SCHEMA_CHANGE = 0x0005
 
 
 class Events(str, Enum):
@@ -67,5 +67,18 @@ class Consitency(int, Enum):
     LOCAL_ONE = 0x000A
 
 
-class Flags(int, Enum):
+class ResultFlags(int, Enum):
+    GLOBAL_TABLES_SPEC = 0x01
+    HAS_MORE_PAGES = 0x02
+    NO_METADATA = 0x04
+
+
+class QueryFlags(int, Enum):
     SKIP_METADATA = 0x02
+
+
+class Flags(int, Enum):
+    COMPRESSION = 0x01
+    TRACING = 0x02
+    CUSTOM_PAYLOAD = 0x04
+    WARNING = 0x08

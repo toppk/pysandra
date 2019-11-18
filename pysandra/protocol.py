@@ -1,8 +1,9 @@
 from struct import pack, unpack, Struct
 from enum import Enum
-from .exceptions import TypeViolation
-from .utils import get_logger
-from .constants import Opcode, Consitency, Flags
+from .exceptions import TypeViolation, UnknownPayloadException, InternalDriverError
+from .utils import get_logger, SBytes
+from .constants import Opcode, Consitency, QueryFlags, Flags, Kind, ResultFlags
+from .types import Rows
 
 logger = get_logger(__name__)
 
@@ -81,6 +82,9 @@ class Types(str, Enum):
             return TypeViolation("should be bytes")
         return f"{Types.INT}{len(text)}s"
 
+    def Bytes(count):
+        return f"{count}s"
+
 
 structs = None
 
@@ -106,8 +110,7 @@ class Protocol:
 
 
 class BaseMessage:
-    def __init__(self):
-        pass
+    pass
 
 
 class RequestMessage(BaseMessage):
@@ -125,34 +128,76 @@ class RequestMessage(BaseMessage):
 
 
 class ResponseMessage(BaseMessage):
-    def __init__(self):
-        pass
+    def __init__(self, version=None, flags=None, stream_id=None):
+        self.version = version
+        self.flags = flags
 
 
 class ReadyResponse(ResponseMessage):
     opcode = Opcode.READY
 
-    def __init__(self, version=None, flags=None):
-        self.version = version
-        self.flags = flags
-
     @staticmethod
     def build(version=None, flags=None, body=None):
-        msg = ReadyResponse(version=version, flags=flags)
+        logger.debug(f"ReadyResponse body={body}")
+        if body != b"":
+            raise UnknownPayloadException(f"READY message should have no payload")
+        msg = ReadyResponse(flags=flags)
         return msg
 
 
 class ResultResponse(ResponseMessage):
     opcode = Opcode.RESULT
 
-    def __init__(self, version=None, flags=None, body=None):
-        self.version = version
-        self.flags = flags
+    def __init__(self, body=None, rows=None, **kwargs):
+        super().__init__(**kwargs)
         self.body = body
+        self.rows = rows
 
     @staticmethod
-    def build(version=None, flags=None, body=None):
+    def build(version=None, flags=None, query_flags=None, body=None):
         msg = ResultResponse(version=version, flags=flags, body=body)
+        body = SBytes(body)
+        logger.debug(f"ResultResponse body={body}")
+        kind = unpack(f"{NETWORK_ORDER}{Types.INT}", body.show(4))[0]
+        print(kind)
+        if kind == Kind.VOID:
+            pass
+        elif kind == Kind.ROWS:
+            result_flags = unpack(f"{NETWORK_ORDER}{Types.INT}", body.show(4))[0]
+            column_count = unpack(f"{NETWORK_ORDER}{Types.INT}", body.show(4))[0]
+            logger.debug(
+                f"ResultResponse result_flags={result_flags} column_count={column_count}"
+            )
+            if result_flags & ResultFlags.HAS_MORE_PAGES != 0x00:
+                # parse paging state
+                pass
+            if result_flags & ResultFlags.NO_METADATA == 0x00:
+                if result_flags & ResultFlags.GLOBAL_TABLES_SPEC != 0x00:
+                    # parse global_table_spec
+                    pass
+                # parse col_spec_i
+                pass
+            # parse rows
+            rows = Rows(column_count=column_count)
+            rows_count = unpack(f"{NETWORK_ORDER}{Types.INT}", body.show(4))[0]
+            for i in range(rows_count * column_count):
+                if body.at_end():
+                    raise InternalDriverError(f"body at end")
+                length = unpack(f"{NETWORK_ORDER}{Types.INT}", body.show(4))[0]
+                rows.add(
+                    unpack(f"{NETWORK_ORDER}{Types.Bytes(length)}", body.show(length))
+                )
+            msg.rows = rows
+            return msg
+
+        elif kind == Kind.SET_KEYSPACE:
+            pass
+        elif kind == Kind.PREPARED:
+            pass
+        elif kind == Kind.SCHEMA_CHANGE:
+            pass
+        else:
+            raise UnknownPayloadException(f"RESULT message has unknown kind={kind}")
         return msg
 
 
@@ -204,7 +249,7 @@ class QueryRequest(RequestMessage):
         )
         #   <consistency><flags>[<n>[name_1]<value_1>...[name_n]<value_n>][<result_page_size>][<paging_state>][<serial_consistency>][<timestamp>][<keyspace>][<now_in_seconds>]
         query_body += get_struct(f"{NETWORK_ORDER}{Types.SHORT}{Types.BYTE}").pack(
-            Consitency.ONE, Flags.SKIP_METADATA
+            Consitency.ONE, QueryFlags.SKIP_METADATA
         )
         # query_body += pack("!HL", Consitency.ONE, 0x0002)
         query_head = self._header_bytes(query_body, stream_id)
