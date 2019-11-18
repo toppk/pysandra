@@ -1,0 +1,16 @@
+-e .
+
+# Optional
+python-snappy
+lz4
+
+flake8
+flake8-bugbear
+flake8-comprehensions
+flake8-pie
+isort
+mypy
+pytest
+pytest-asyncio
+pytest-cov
+trustme

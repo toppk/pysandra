@@ -1,1 +1,6 @@
 __pycache__
+pysandra/newsfragments/
+venv/
+.nox/
+pip-wheel-metadata/
+pysandra.egg-info/

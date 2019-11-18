@@ -1,6 +1,6 @@
 import asyncio
-import traceback
 import sys
+import traceback
 
 from .utils import get_logger
 

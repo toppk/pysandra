@@ -1,0 +1,4 @@
+[tool.towncrier]
+    package = "pysandra"
+    package_dir = "."
+    filename = "CHANGELOG.md"

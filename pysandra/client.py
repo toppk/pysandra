@@ -1,15 +1,15 @@
 import asyncio
 
+from .constants import REQUEST_TIMEOUT, STARTUP_TIMEOUT
 from .dispatcher import Dispatcher
-from .v4protocol import V4Protocol
-from .constants import STARTUP_TIMEOUT, REQUEST_TIMEOUT
 from .exceptions import (
-    MaximumStreamsException,
     InternalDriverError,
-    StartupTimeout,
+    MaximumStreamsException,
     RequestTimeout,
+    StartupTimeout,
 )
 from .utils import get_logger
+from .v4protocol import V4Protocol
 
 logger = get_logger(__name__)
 

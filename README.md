@@ -21,6 +21,14 @@ Aims to be:
 * AUTH
 * typing
 
+## Developing
+
+$ cd pysandra
+$ python3 -m venv venv
+$ source venv/bin/activate
+$ pip install -r test-requirements.txt
+$ pip install -e .
+
 
 ## License
 

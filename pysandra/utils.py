@@ -1,7 +1,6 @@
+import logging
 import os
 import sys
-import logging
-import typing
 
 _LOGGER_INITIALIZED = False
 
@@ -9,7 +8,7 @@ _LOGGER_INITIALIZED = False
 def get_logger(name: str) -> logging.Logger:
     """
     Get a `logging.Logger` instance, and optionally
-    set up debug logging based on the HTTPX_LOG_LEVEL environment variable.
+    set up debug logging based on the PYSANDRA_LOG_LEVEL environment variable.
     """
     global _LOGGER_INITIALIZED
 

@@ -1,0 +1,65 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+import os
+from pathlib import Path
+
+from setuptools import setup
+
+
+def get_long_description():
+    """
+    Return the README.
+    """
+    long_description = ""
+    with open("README.md", encoding="utf8") as f:
+        long_description += f.read()
+    long_description += "\n\n"
+    with open("CHANGELOG.md", encoding="utf8") as f:
+        long_description += f.read()
+    return long_description
+
+
+def get_packages(package):
+    """
+    Return root package and all sub-packages.
+    """
+    return [str(path.parent) for path in Path(package).glob("**/__init__.py")]
+
+
+about = {}
+base_dir = os.path.dirname(__file__)
+src_dir = os.path.join(base_dir, ".")
+with open(os.path.join(src_dir, "pysandra", "__about__.py")) as f:
+    exec(f.read(), about)
+
+setup(
+    name=about["__title__"],
+    python_requires=">=3.6",
+    version=about["__version__"],
+    url=about["__uri__"],
+    license=about["__license__"],
+    description=about["__description__"],
+    long_description=get_long_description(),
+    long_description_content_type="text/markdown",
+    author=about["__author__"],
+    author_email=about["__email__"],
+    package_data={"pysandra": ["py.typed"]},
+    packages=get_packages("pysandra"),
+    include_package_data=True,
+    zip_safe=False,
+    install_requires=[],
+    classifiers=[
+        "Development Status :: 3 - Alpha",
+        "Environment :: Web Environment",
+        "Intended Audience :: Developers",
+        "License :: OSI Approved :: Apache Software License",
+        "License :: OSI Approved :: MIT License",
+        "Operating System :: OS Independent",
+        "Topic :: Software Development :: Libraries :: Python Modules",
+        "Framework :: AsyncIO",
+        "Programming Language :: Python :: 3.6",
+        "Programming Language :: Python :: 3.7",
+        "Programming Language :: Python :: 3.8",
+    ],
+)

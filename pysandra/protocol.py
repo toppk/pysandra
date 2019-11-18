@@ -1,22 +1,23 @@
-from struct import pack, unpack, Struct
 from enum import Enum
-from .exceptions import (
-    TypeViolation,
-    UnknownPayloadException,
-    InternalDriverError,
-    BadInputException,
-)
-from .utils import get_logger, SBytes
+from struct import Struct, pack, unpack
+
 from .constants import (
-    Opcode,
     Consitency,
-    QueryFlags,
     Flags,
     Kind,
-    ResultFlags,
+    Opcode,
     OptionID,
+    QueryFlags,
+    ResultFlags,
+)
+from .exceptions import (
+    BadInputException,
+    InternalDriverError,
+    TypeViolation,
+    UnknownPayloadException,
 )
 from .types import Rows
+from .utils import SBytes, get_logger
 
 logger = get_logger(__name__)
 
@@ -216,7 +217,6 @@ class ResultMessage(ResponseMessage):
                     # parse global_table_spec
                     pass
                 # parse col_spec_i
-                pass
             # parse rows
             rows = Rows(column_count=column_count)
             rows_count = unpack(f"{NETWORK_ORDER}{Types.INT}", body.show(4))[0]
@@ -326,7 +326,6 @@ class ResultMessage(ResponseMessage):
                     # parse global_table_spec
                     pass
                 # parse col_spec_i
-                pass
             msg = PreparedResultMessage(
                 version=version,
                 flags=flags,
