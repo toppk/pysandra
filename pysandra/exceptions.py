@@ -4,7 +4,7 @@ class DriverError(Exception):
         self._args = args
 
 
-## bugs
+# bugs
 
 
 class InternalDriverError(DriverError):
@@ -19,7 +19,7 @@ class RequestTimeout(InternalDriverError):
     pass
 
 
-## user errors
+# user errors
 class UsageException(DriverError):
     pass
 
@@ -36,7 +36,7 @@ class BadInputException(UsageException):
     pass
 
 
-## server errors
+# server errors
 class ServerError(DriverError):
     pass
 

@@ -2,12 +2,7 @@ import asyncio
 
 from .constants import REQUEST_TIMEOUT, STARTUP_TIMEOUT
 from .dispatcher import Dispatcher
-from .exceptions import (
-    InternalDriverError,
-    MaximumStreamsException,
-    RequestTimeout,
-    StartupTimeout,
-)
+from .exceptions import MaximumStreamsException, RequestTimeout, StartupTimeout
 from .utils import get_logger
 from .v4protocol import V4Protocol
 

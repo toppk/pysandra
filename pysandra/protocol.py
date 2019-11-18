@@ -1,15 +1,7 @@
 from enum import Enum
 from struct import Struct, pack, unpack
 
-from .constants import (
-    Consitency,
-    Flags,
-    Kind,
-    Opcode,
-    OptionID,
-    QueryFlags,
-    ResultFlags,
-)
+from .constants import Consitency, Kind, Opcode, OptionID, QueryFlags, ResultFlags
 from .exceptions import (
     BadInputException,
     InternalDriverError,
@@ -158,8 +150,7 @@ class ReadyMessage(ResponseMessage):
             raise UnknownPayloadException(
                 f"READY message should have no payload={body.show()}"
             )
-        msg = ReadyMessage(flags=flags)
-        return msg
+        return ReadyMessage(flags=flags)
 
 
 class ErrorMessage(ResponseMessage):
@@ -220,7 +211,7 @@ class ResultMessage(ResponseMessage):
             # parse rows
             rows = Rows(column_count=column_count)
             rows_count = unpack(f"{NETWORK_ORDER}{Types.INT}", body.show(4))[0]
-            for i in range(rows_count * column_count):
+            for _cnt in range(rows_count * column_count):
                 if body.at_end():
                     raise InternalDriverError(f"body at end")
                 length = unpack(f"{NETWORK_ORDER}{Types.INT}", body.show(4))[0]
@@ -247,7 +238,7 @@ class ResultMessage(ResponseMessage):
             query_id = unpack(
                 f"{NETWORK_ORDER}{Types.Bytes(length)}", body.show(length)
             )[0]
-            ## <metadata>
+            # <metadata>
             # <flags>
             flags = unpack(f"{NETWORK_ORDER}{Types.INT}", body.show(4))[0]
             # <columns_count>
@@ -281,7 +272,7 @@ class ResultMessage(ResponseMessage):
             # <col_spec_i>
             col_specs = []
             if columns_count > 0:
-                for col in range(columns_count):
+                for _col in range(columns_count):
                     col_spec = {}
                     if flags & ResultFlags.GLOBAL_TABLES_SPEC == 0:
                         # <ksname><tablename>
@@ -326,6 +317,8 @@ class ResultMessage(ResponseMessage):
                     # parse global_table_spec
                     pass
                 # parse col_spec_i
+                for _col in range(result_columns_count):
+                    pass
             msg = PreparedResultMessage(
                 version=version,
                 flags=flags,
@@ -388,9 +381,6 @@ class StartupMessage(RequestMessage):
                 len(value_bytes),
                 value_bytes,
             )
-        test = get_struct(
-            f"{NETWORK_ORDER}{Types.BYTE}{Types.BYTE}{Types.SHORT}{Types.BYTE}{Types.INT}"
-        )
         startup_head = self._header_bytes(startup_body, stream_id=stream_id)
         startup_send = startup_head + startup_body
         logger.debug(f"msg={startup_send}")
@@ -412,7 +402,7 @@ class ExecuteMessage(RequestMessage):
         # data check
         if len(self.col_specs) != len(self.query_params):
             raise BadInputException(
-                f" count of execute params={len(query_params)} doesn't match prepared statement count={len(self.col_specs)}"
+                f" count of execute params={len(self.query_params)} doesn't match prepared statement count={len(self.col_specs)}"
             )
         # <id>
         execute_body = pack(
@@ -420,7 +410,7 @@ class ExecuteMessage(RequestMessage):
             len(self.query_id),
             self.query_id,
         )
-        ##   <query_parameters>
+        #   <query_parameters>
         #     <consistency><flags>
         execute_body += get_struct(f"{NETWORK_ORDER}{Types.SHORT}{Types.BYTE}").pack(
             Consitency.ONE, QueryFlags.VALUES

@@ -2,6 +2,7 @@ import asyncio
 import sys
 import traceback
 
+from .exceptions import InternalDriverError, MaximumStreamsException
 from .utils import get_logger
 
 logger = get_logger(__name__)
@@ -93,7 +94,8 @@ class Dispatcher:
         except asyncio.CancelledError as e:
             if self._running:
                 raise (e)
-        except:
+        # do I know what I'm doing?
+        except BaseException:
             traceback.print_exc(file=sys.stdout)
 
     async def _connect(self):

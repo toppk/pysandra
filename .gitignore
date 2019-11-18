@@ -4,3 +4,4 @@ venv/
 .nox/
 pip-wheel-metadata/
 pysandra.egg-info/
+.mypy_cache/

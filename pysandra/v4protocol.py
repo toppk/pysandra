@@ -1,4 +1,4 @@
-from .constants import CQL_VERSION, SERVER_SENT, Consitency, Flags, Opcode, Options
+from .constants import CQL_VERSION, SERVER_SENT, Opcode, Options
 from .exceptions import (
     InternalDriverError,
     ServerError,

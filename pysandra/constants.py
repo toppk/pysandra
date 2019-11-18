@@ -1,13 +1,13 @@
 # https://github.com/apache/cassandra/blob/trunk/doc/native_protocol_v4.spec
 from enum import Enum
 
-## driver
+# driver
 
 # in seconds
 STARTUP_TIMEOUT = 10
 REQUEST_TIMEOUT = 10
 
-## wire protocol
+# wire protocol
 
 CQL_VERSION = "3.0.0"
 SERVER_SENT = 0x80

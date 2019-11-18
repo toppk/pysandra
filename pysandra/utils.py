@@ -28,9 +28,7 @@ def get_logger(name: str) -> logging.Logger:
             )
             logger.addHandler(handler)
 
-    logger = logging.getLogger(name)
-
-    return logger
+    return logging.getLogger(name)
 
 
 class SBytes(bytes):
