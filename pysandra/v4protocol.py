@@ -7,6 +7,7 @@ from .protocol import (
     StartupMessage,
     ReadyMessage,
     QueryMessage,
+    ErrorMessage,
     PrepareMessage,
     ExecuteMessage,
     ResultMessage,
@@ -17,6 +18,7 @@ from .protocol import (
 from .exceptions import (
     VersionMismatchException,
     InternalDriverError,
+    ServerError,
     UnknownPayloadException,
 )
 from .utils import get_logger
@@ -84,7 +86,11 @@ class V4Protocol(Protocol):
     def build_response(self, request, version, flags, stream, opcode, length, body):
         response = None
         if opcode == Opcode.ERROR:
-            pass
+            response = ErrorMessage.build(version=version, flags=flags, body=body)
+            raise ServerError(
+                f'got error_code={response.error_code:x} with description="{response.error_text}"',
+                msg=response,
+            )
         elif opcode == Opcode.READY:
             response = ReadyMessage.build(version=version, flags=flags, body=body)
         elif opcode == Opcode.AUTHENTICATE:

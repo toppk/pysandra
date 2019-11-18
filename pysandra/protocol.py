@@ -138,10 +138,39 @@ class ReadyMessage(ResponseMessage):
 
     @staticmethod
     def build(version=None, flags=None, body=None):
+        body = SBytes(body)
         logger.debug(f"ReadyResponse body={body}")
-        if body != b"":
-            raise UnknownPayloadException(f"READY message should have no payload")
+        if not body.at_end():
+            raise UnknownPayloadException(
+                f"READY message should have no payload={body.show()}"
+            )
         msg = ReadyMessage(flags=flags)
+        return msg
+
+
+class ErrorMessage(ResponseMessage):
+    opcode = Opcode.ERROR
+
+    def __init__(self, error_code=None, error_text=None, **kwargs):
+        super().__init__(**kwargs)
+        self.error_code = error_code
+        self.error_text = error_text
+
+    @staticmethod
+    def build(version=None, flags=None, body=None):
+        body = SBytes(body)
+        logger.debug(f"ErrorResponse body={body}")
+        error_code = unpack(f"{NETWORK_ORDER}{Types.INT}", body.show(4))[0]
+        logger.debug(f"ErrorMessage error_code={error_code:x}")
+        length = unpack(f"{NETWORK_ORDER}{Types.SHORT}", body.show(2))[0]
+        error_text = unpack(f"{NETWORK_ORDER}{Types.Bytes(length)}", body.show(length))[
+            0
+        ].decode("utf-8")
+        msg = ErrorMessage(flags=flags, error_code=error_code, error_text=error_text)
+        if not body.at_end():
+            raise InternalDriverError(
+                f"ErrorMessage still data left remains={body.show()}"
+            )
         return msg
 
 
