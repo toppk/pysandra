@@ -1,4 +1,4 @@
-name: Python application
+name: Commit Matrix Testing
 
 on: [push]
 

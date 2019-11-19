@@ -10,6 +10,7 @@ edit_uri: ""
 
 nav:
     - Introduction: 'index.md'
+    - Developing: 'developing.md'
     - V4 Spec: 'native_protocol_v4.spec'
     - V5 Spec: 'native_protocol_v5.spec'
 

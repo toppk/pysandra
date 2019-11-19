@@ -1,4 +1,3 @@
-
 def cli():
-   print("hello!")
-   return 0
+    print("hello!")
+    return 0

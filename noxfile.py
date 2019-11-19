@@ -61,7 +61,7 @@ def serve(session):
     session.run("mkdocs", "serve")
 
 
-@nox.session(python=["3.7"])
+@nox.session(python=["3.6", "3.7"])
 def test(session):
     session.install("--upgrade", "-r", "test-requirements.txt")
     session.run("python", "-m", "pytest", *session.posargs)

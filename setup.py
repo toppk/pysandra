@@ -4,8 +4,9 @@
 import os
 from pathlib import Path
 
-from setuptools import setup
 import setuptools
+from setuptools import setup
+
 print(setuptools.__file__)
 
 
@@ -51,9 +52,7 @@ setup(
     include_package_data=True,
     zip_safe=False,
     install_requires=[],
-    extras_require={
-            'compression': ['python-snappy', 'lz4'],
-    },
+    extras_require={"compression": ["python-snappy", "lz4"]},
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Intended Audience :: Developers",
