@@ -9,3 +9,4 @@ site/
 .coverage
 build/
 dist/
+cqlshell.egg-info/
