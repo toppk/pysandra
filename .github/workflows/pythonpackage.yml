@@ -1,4 +1,4 @@
-name: Commit Matrix Testing
+name: Build Status
 
 on: [push]
 

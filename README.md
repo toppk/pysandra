@@ -14,7 +14,27 @@ Please check back often, I hope to get this to a generally useful state this yea
 
 Contributions, advice welcome, development coodinated on github
 
-## Progress
+
+
+<p align="center">
+  <a href="https://pysandra.readthedocs.org/"><img width="350" height="208" src="https://raw.githubusercontent.com/toppk/pysandra/master/docs/img/logo.jpg" alt='pysandra'></a>
+</p>
+
+<p align="center"><strong>pysandra</strong> <em>- An asyncio based Cassandra client for Python.</em></p>
+
+<p align="center">
+
+<a href="https://actions-badge.atrox.dev/toppk/pysandra/goto?ref=master"><img alt="Build Status" src="https://github.com/toppk/pysandra/workflows/Build%20Status/badge.svg" /></a>
+
+<a href="https://pypi.org/project/pysandra/">
+    <img src="https://badge.fury.io/py/pysandra.svg" alt="Package version">
+</a>
+Progress
+
+
+
+
+## </p>
 
 In case you didn't read the notice, there's quite a limited set of funcationity at the moment.
 
