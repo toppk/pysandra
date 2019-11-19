@@ -52,7 +52,10 @@ setup(
     include_package_data=True,
     zip_safe=False,
     install_requires=[],
-    extras_require={"compression": ["python-snappy", "lz4"]},
+    extras_require={
+        "compression": ["python-snappy", "lz4"],
+        "docs": ["mkdocs", "mkdocs-material", "mkautodoc"],
+    },
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Intended Audience :: Developers",

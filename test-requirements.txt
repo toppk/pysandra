@@ -4,7 +4,9 @@
 python-snappy
 lz4
 
+black
 flake8
+autoflake
 flake8-bugbear
 flake8-comprehensions
 flake8-pie
