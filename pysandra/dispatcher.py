@@ -123,14 +123,16 @@ class Dispatcher:
             self._host, self._port
         )
         self._connected = True
-        self._read_task = asyncio.create_task(self._listener())
+        # avoid create_task for 3.6 compatability
+        self._read_task = asyncio.ensure_future(self._listener())
 
     async def close(self) -> None:
         self._writer.close()
         self._connected = False
         self._running = False
         self._read_task.cancel()
-        await self._writer.wait_closed()
+        # cannot use wait_closed for 3.6 compatability
+        # await self._writer.wait_closed()
 
 
 if __name__ == "__main__":
