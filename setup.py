@@ -5,6 +5,8 @@ import os
 from pathlib import Path
 
 from setuptools import setup
+import setuptools
+print(setuptools.__file__)
 
 
 def get_long_description():
@@ -49,9 +51,11 @@ setup(
     include_package_data=True,
     zip_safe=False,
     install_requires=[],
+    extras_require={
+            'compression': ['python-snappy', 'lz4'],
+    },
     classifiers=[
         "Development Status :: 3 - Alpha",
-        "Environment :: Web Environment",
         "Intended Audience :: Developers",
         "License :: OSI Approved :: Apache Software License",
         "License :: OSI Approved :: MIT License",

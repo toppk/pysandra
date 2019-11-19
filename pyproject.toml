@@ -1,3 +1,5 @@
+[build-system]
+requires = ["setuptools", "wheel"]
 [tool.towncrier]
     package = "pysandra"
     package_dir = "."
