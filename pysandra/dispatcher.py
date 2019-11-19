@@ -12,9 +12,6 @@ logger = get_logger(__name__)
 
 
 class Dispatcher:
-    _writer: "asyncio.StreamWriter"
-    _reader: "asyncio.StreamReader"
-
     def __init__(
         self, host: str = None, port: int = None, protocol: "Protocol" = None
     ) -> None:
@@ -29,6 +26,9 @@ class Dispatcher:
         self._connected = False
         self._running = False
         self._last_stream_id: Optional[int] = None
+        self._writer: Optional["asyncio.StreamWriter"] = None
+        self._reader: Optional["asyncio.StreamReader"] = None
+        self._read_task: Optional["asyncio.Future"] = None
 
     def _rm_stream_id(
         self, stream_id: int
@@ -84,10 +84,12 @@ class Dispatcher:
         request = request_handler(stream_id=stream_id, params=params)
         event = asyncio.Event()
         self._update_stream_id(stream_id, (request, response_handler, event))
+        assert self._writer is not None
         self._writer.write(request.to_bytes())
         return event
 
     async def _receive(self) -> None:
+        assert self._reader is not None
         head = await self._reader.read(9)
         logger.debug(f"in _receive head={head!r}")
         version, flags, stream, opcode, length = self._proto.decode_header(head)
@@ -127,10 +129,12 @@ class Dispatcher:
         self._read_task = asyncio.ensure_future(self._listener())
 
     async def close(self) -> None:
-        self._writer.close()
+        if self._writer is not None:
+            self._writer.close()
         self._connected = False
         self._running = False
-        self._read_task.cancel()
+        if self._read_task is not None:
+            self._read_task.cancel()
         # cannot use wait_closed for 3.6 compatability
         # await self._writer.wait_closed()
 
