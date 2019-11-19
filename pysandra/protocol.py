@@ -1,15 +1,23 @@
 from enum import Enum
 from struct import Struct, pack, unpack
-from typing import Any, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
-from .constants import Consitency, Kind, Opcode, OptionID, QueryFlags, ResultFlags
+from .constants import (
+    Consitency,
+    Kind,
+    Opcode,
+    OptionID,
+    QueryFlags,
+    ResultFlags,
+    SchemaChangeTarget,
+)
 from .exceptions import (
     BadInputException,
     InternalDriverError,
     TypeViolation,
     UnknownPayloadException,
 )
-from .types import Rows
+from .types import ExpectedResponses, Rows, SchemaChange, SchemaChangeType
 from .utils import SBytes, get_logger
 
 logger = get_logger(__name__)
@@ -114,6 +122,25 @@ def get_struct(fmt: str) -> Struct:
     return structs[fmt]
 
 
+def get_short(sbytes: "SBytes") -> int:
+    return unpack(f"{NETWORK_ORDER}{STypes.SHORT}", sbytes.show(2))[0]
+
+
+def get_string(sbytes: "SBytes") -> str:
+    length = get_short(sbytes)
+    return unpack(f"{NETWORK_ORDER}{STypes.Bytes(length)}", sbytes.show(length))[
+        0
+    ].decode("utf-8")
+
+
+def get_strings_list(sbytes: "SBytes") -> List[str]:
+    string_list = []
+    num_strings = get_short(sbytes)
+    for _cnt in range(num_strings):
+        string_list.append(get_string(sbytes))
+    return string_list
+
+
 class Protocol:
     def decode_header(self, header: bytes) -> Tuple[int, int, int, int, int]:
         pass
@@ -130,7 +157,7 @@ class Protocol:
         opcode: int,
         length: int,
         body: bytes,
-    ) -> Union[bool, "Rows", bytes]:
+    ) -> "ExpectedResponses":
         pass
 
     def query(self, stream_id: int = None, params: dict = None) -> "QueryMessage":
@@ -273,8 +300,7 @@ class ResultMessage(ResponseMessage):
                 elif length == 0:
                     cell = b""
                 rows.add(cell)
-            msg = RowsResultMessage(version=version, flags=flags, kind=kind)
-            msg.rows = rows
+            msg = RowsResultMessage(version=version, flags=flags, kind=kind, rows=rows)
 
         elif kind == Kind.SET_KEYSPACE:
             pass
@@ -378,7 +404,43 @@ class ResultMessage(ResponseMessage):
                 query_id=query_id,
             )
         elif kind == Kind.SCHEMA_CHANGE:
-            pass
+            # <change_type>
+            try:
+                string = get_string(sbody)
+                change_type = SchemaChangeType(string)
+            except ValueError:
+                raise UnknownPayloadException(
+                    f"got unexpected change_type={change_type}"
+                )
+            # <target>
+            try:
+                string = get_string(sbody)
+                target = SchemaChangeTarget(string)
+            except ValueError:
+                raise UnknownPayloadException(f"got unexpected target={target}")
+            # <options>
+            options: Dict[str, Union[str, List[str]]] = {}
+            if target == SchemaChangeTarget.KEYSPACE:
+                options["target_name"] = get_string(sbody)
+            elif target in (SchemaChangeTarget.TABLE, SchemaChangeTarget.TYPE):
+                options["keyspace_name"] = get_string(sbody)
+                options["target_name"] = get_string(sbody)
+            elif target in (SchemaChangeTarget.FUNCTION, SchemaChangeTarget.AGGREGATE):
+                options["keyspace_name"] = get_string(sbody)
+                options["target_name"] = get_string(sbody)
+                options["argument_types"] = get_strings_list(sbody)
+            else:
+                raise InternalDriverError(
+                    f"unhandled target={target} with body={sbody.show()!r}"
+                )
+
+            print(
+                f"SCHEMA_CHANGE change_type={change_type} target={target} options={options}"
+            )
+            schema_change = SchemaChange(change_type, target, options)
+            msg = SchemaResultMessage(
+                version=version, flags=flags, kind=kind, schema_change=schema_change,
+            )
         else:
             raise UnknownPayloadException(f"RESULT message has unknown kind={kind}")
         if msg is None:
@@ -393,14 +455,21 @@ class ResultMessage(ResponseMessage):
 
 
 class RowsResultMessage(ResultMessage):
-    rows: "Rows"
-
-    def __init__(self, **kwargs: Any) -> None:
+    def __init__(self, rows: "Rows" = None, **kwargs: Any) -> None:
+        assert rows is not None
+        self.rows: "Rows" = rows
         super().__init__(**kwargs)
 
 
 class VoidResultMessage(ResultMessage):
     pass
+
+
+class SchemaResultMessage(ResultMessage):
+    def __init__(self, schema_change: "SchemaChange" = None, **kwargs: Any) -> None:
+        assert schema_change is not None
+        self.schema_change: "SchemaChange" = schema_change
+        super().__init__(**kwargs)
 
 
 class PreparedResultMessage(ResultMessage):

@@ -1,4 +1,8 @@
-from typing import List
+from typing import List, Union
+
+from .constants import SchemaChangeTarget, SchemaChangeType
+
+ExpectedResponses = Union[bool, "Rows", bytes, "SchemaChange"]
 
 
 class BaseType:
@@ -11,6 +15,18 @@ class UnknownType(BaseType):
 
 class AsciiType(BaseType):
     pass
+
+
+class SchemaChange:
+    def __init__(
+        self,
+        change_type: "SchemaChangeType",
+        target: "SchemaChangeTarget",
+        options: dict,
+    ) -> None:
+        self.change_type = change_type
+        self.target = target
+        self.options = options
 
 
 class Rows:

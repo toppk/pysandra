@@ -1,4 +1,4 @@
-from typing import Dict, Optional, Tuple, Union
+from typing import Dict, Optional, Tuple
 
 from .constants import CQL_VERSION, SERVER_SENT, Opcode, Options
 from .exceptions import (
@@ -20,12 +20,13 @@ from .protocol import (
     ResponseMessage,
     ResultMessage,
     RowsResultMessage,
+    SchemaResultMessage,
     StartupMessage,
     STypes,
     VoidResultMessage,
     get_struct,
 )
-from .types import Rows  # noqa: F401
+from .types import ExpectedResponses  # noqa: F401
 from .utils import get_logger
 
 logger = get_logger(__name__)
@@ -103,7 +104,7 @@ class V4Protocol(Protocol):
         opcode: int,
         length: int,
         body: bytes,
-    ) -> Union[bool, "Rows", bytes]:
+    ) -> "ExpectedResponses":
         response: Optional["ResponseMessage"] = None
         if opcode == Opcode.ERROR:
             response = ErrorMessage.build(version=version, flags=flags, body=body)
@@ -137,7 +138,7 @@ class V4Protocol(Protocol):
 
     def respond(
         self, request: "RequestMessage", response: "ResponseMessage"
-    ) -> Union[bool, "Rows", bytes]:
+    ) -> "ExpectedResponses":
         if request.opcode == Opcode.STARTUP:
             if response.opcode == Opcode.READY:
                 return True
@@ -147,6 +148,8 @@ class V4Protocol(Protocol):
                     return True
                 elif isinstance(response, RowsResultMessage):
                     return response.rows
+                elif isinstance(response, SchemaResultMessage):
+                    return response.schema_change
         elif request.opcode == Opcode.PREPARE:
             if response.opcode == Opcode.RESULT:
                 if isinstance(response, PreparedResultMessage):

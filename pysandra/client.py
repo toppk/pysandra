@@ -1,11 +1,11 @@
 import asyncio
-from typing import Tuple, Union
+from typing import Tuple
 
 from .constants import REQUEST_TIMEOUT, STARTUP_TIMEOUT
 from .dispatcher import Dispatcher
 from .exceptions import RequestTimeout, StartupTimeout
 from .protocol import Protocol
-from .types import Rows  # noqa: F401
+from .types import ExpectedResponses  # noqa: F401
 from .utils import get_logger
 from .v4protocol import V4Protocol
 
@@ -24,7 +24,7 @@ class Client:
     def protocol(self) -> "Protocol":
         return self._proto
 
-    async def is_ready(self) -> bool:
+    async def connect(self) -> None:
         if not self._is_ready:
             await self._startup()
             try:
@@ -33,7 +33,6 @@ class Client:
                 )
             except asyncio.TimeoutError as e:
                 raise StartupTimeout(e) from None
-        return True
 
     async def _startup(self) -> None:
         if self._in_startup:
@@ -56,10 +55,8 @@ class Client:
     async def close(self) -> None:
         await self._dispatcher.close()
 
-    async def execute(
-        self, stmt: str, args: Tuple = None
-    ) -> Union[bytes, "Rows", bool]:
-        await self.is_ready()
+    async def execute(self, stmt: str, args: Tuple = None) -> "ExpectedResponses":
+        await self.connect()
         if args is None:
             # query
             event = await self._dispatcher.send(
@@ -86,7 +83,7 @@ class Client:
                 raise RequestTimeout(e) from None
 
     async def prepare(self, stmt: str) -> bytes:
-        await self.is_ready()
+        await self.connect()
         event = await self._dispatcher.send(
             self.protocol.prepare, self.protocol.build_response, params={"query": stmt}
         )

@@ -1,11 +1,11 @@
 import asyncio
 import sys
 import traceback
-from typing import Callable, Dict, Optional, Tuple, Union
+from typing import Callable, Dict, Optional, Tuple
 
 from .exceptions import InternalDriverError, MaximumStreamsException
 from .protocol import Protocol, RequestMessage  # noqa: F401
-from .types import Rows  # noqa: F401
+from .types import ExpectedResponses  # noqa: F401
 from .utils import get_logger
 
 logger = get_logger(__name__)
@@ -19,7 +19,7 @@ class Dispatcher:
         self._port = port
         assert protocol is not None
         self._proto = protocol
-        self._data: Dict["asyncio.Event", Union[bytes, "Rows", bool]] = {}
+        self._data: Dict["asyncio.Event", "ExpectedResponses"] = {}
         self._streams: Dict[
             int, Optional[Tuple["RequestMessage", Callable, asyncio.Event]]
         ] = {}
@@ -99,7 +99,7 @@ class Dispatcher:
         self._data[event] = data
         event.set()
 
-    def retrieve(self, event: "asyncio.Event") -> Union[bytes, "Rows", bool]:
+    def retrieve(self, event: "asyncio.Event") -> "ExpectedResponses":
         try:
             return self._data.pop(event)
         except KeyError:
