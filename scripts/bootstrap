@@ -6,6 +6,7 @@ pip install -U pip setuptools wheel nox
 pip install -U mkdocs mkdocs-material mkautodoc
 pip install -U twine
 pip install -r test-requirements.txt
+pip install -e tools/cqlshell
 pip install -e ".[compression]"
 echo remember to \"source venv/bin/activate\" to enter the virtualenv
 echo you can run \"deactivate\" to leave the virtualenv
