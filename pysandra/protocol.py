@@ -122,26 +122,26 @@ def get_struct(fmt: str) -> Struct:
     return structs[fmt]
 
 
-def get_short(sbytes: "SBytes") -> int:
+def decode_short(sbytes: "SBytes") -> int:
     return unpack(f"{NETWORK_ORDER}{STypes.SHORT}", sbytes.show(2))[0]
 
 
-def get_int(sbytes: "SBytes") -> int:
+def decode_int(sbytes: "SBytes") -> int:
     return unpack(f"{NETWORK_ORDER}{STypes.INT}", sbytes.show(4))[0]
 
 
-def get_string(sbytes: "SBytes") -> str:
-    length = get_short(sbytes)
+def decode_string(sbytes: "SBytes") -> str:
+    length = decode_short(sbytes)
     return unpack(f"{NETWORK_ORDER}{STypes.Bytes(length)}", sbytes.show(length))[
         0
     ].decode("utf-8")
 
 
-def get_strings_list(sbytes: "SBytes") -> List[str]:
+def decode_strings_list(sbytes: "SBytes") -> List[str]:
     string_list = []
-    num_strings = get_short(sbytes)
+    num_strings = decode_short(sbytes)
     for _cnt in range(num_strings):
-        string_list.append(get_string(sbytes))
+        string_list.append(decode_string(sbytes))
     return string_list
 
 
@@ -226,9 +226,9 @@ class ErrorMessage(ResponseMessage):
     @staticmethod
     def build(version: int, flags: int, body: "SBytes") -> "ErrorMessage":
         logger.debug(f"ErrorResponse body={body!r}")
-        error_code = get_int(body)
+        error_code = decode_int(body)
         logger.debug(f"ErrorMessage error_code={error_code:x}")
-        error_text = get_string(body)
+        error_text = decode_string(body)
         return ErrorMessage(flags=flags, error_code=error_code, error_text=error_text)
 
 
@@ -242,13 +242,13 @@ class ResultMessage(ResponseMessage):
     @staticmethod
     def build(version: int, flags: int, body: "SBytes",) -> "ResultMessage":
         msg: Optional["ResultMessage"] = None
-        kind = get_int(body)
+        kind = decode_int(body)
         logger.debug(f"ResultResponse kind={kind} body={body!r}")
         if kind == Kind.VOID:
             msg = VoidResultMessage(version, flags, kind)
         elif kind == Kind.ROWS:
-            result_flags = get_int(body)
-            column_count = get_int(body)
+            result_flags = decode_int(body)
+            column_count = decode_int(body)
             logger.debug(
                 f"ResultResponse result_flags={result_flags} column_count={column_count}"
             )
@@ -262,9 +262,9 @@ class ResultMessage(ResponseMessage):
                 # parse col_spec_i
             # parse rows
             rows = Rows(column_count=column_count)
-            rows_count = get_int(body)
+            rows_count = decode_int(body)
             for _cnt in range(rows_count * column_count):
-                length = get_int(body)
+                length = decode_int(body)
                 cell: bytes = b""
                 if length > 0:
                     cell = unpack(
@@ -279,7 +279,7 @@ class ResultMessage(ResponseMessage):
             pass
         elif kind == Kind.PREPARED:
             # <id>
-            length = get_short(body)
+            length = decode_short(body)
             if length < 1:
                 raise InternalDriverError(
                     f"cannot store prepared query id with length={length}"
@@ -289,11 +289,11 @@ class ResultMessage(ResponseMessage):
             )[0]
             # <metadata>
             # <flags>
-            flags = get_int(body)
+            flags = decode_int(body)
             # <columns_count>
-            columns_count = get_int(body)
+            columns_count = decode_int(body)
             # <pk_count>
-            pk_count = get_int(body)
+            pk_count = decode_int(body)
             pk_index = None
             if pk_count > 0:
                 pk_index = list(
@@ -309,9 +309,9 @@ class ResultMessage(ResponseMessage):
             assert flags is not None
             if flags & ResultFlags.GLOBAL_TABLES_SPEC != 0:
                 # <keyspace>
-                keyspace = get_string(body)
+                keyspace = decode_string(body)
                 # <table>
-                table = get_string(body)
+                table = decode_string(body)
                 logger.debug(f"build keyspace={keyspace} table={table}")
             # <col_spec_i>
             col_specs = []
@@ -320,21 +320,21 @@ class ResultMessage(ResponseMessage):
                     col_spec: Dict[str, Union[str, int]] = {}
                     if flags & ResultFlags.GLOBAL_TABLES_SPEC == 0:
                         # <ksname><tablename>
-                        col_spec["ksname"] = get_string(body)
-                        col_spec["tablename"] = get_string(body)
+                        col_spec["ksname"] = decode_string(body)
+                        col_spec["tablename"] = decode_string(body)
                     # <name><type>
-                    col_spec["name"] = get_string(body)
+                    col_spec["name"] = decode_string(body)
                     # <type>
-                    option_id = get_short(body)
+                    option_id = decode_short(body)
                     if option_id < 0x0001 or option_id > 0x0014:
                         raise InternalDriverError(f"unhandled option_id={option_id}")
                     col_spec["option_id"] = option_id
                     col_specs.append(col_spec)
             # <result_metadata>
             # <flags>
-            result_flags = get_int(body)
+            result_flags = decode_int(body)
             # <columns_count>
-            result_columns_count = get_int(body)
+            result_columns_count = decode_int(body)
             if result_flags & ResultFlags.HAS_MORE_PAGES != 0x00:
                 # parse paging state
                 pass
@@ -349,7 +349,7 @@ class ResultMessage(ResponseMessage):
         elif kind == Kind.SCHEMA_CHANGE:
             # <change_type>
             try:
-                string = get_string(body)
+                string = decode_string(body)
                 change_type = SchemaChangeType(string)
             except ValueError:
                 raise UnknownPayloadException(
@@ -357,21 +357,21 @@ class ResultMessage(ResponseMessage):
                 )
             # <target>
             try:
-                string = get_string(body)
+                string = decode_string(body)
                 target = SchemaChangeTarget(string)
             except ValueError:
                 raise UnknownPayloadException(f"got unexpected target={target}")
             # <options>
             options: Dict[str, Union[str, List[str]]] = {}
             if target == SchemaChangeTarget.KEYSPACE:
-                options["target_name"] = get_string(body)
+                options["target_name"] = decode_string(body)
             elif target in (SchemaChangeTarget.TABLE, SchemaChangeTarget.TYPE):
-                options["keyspace_name"] = get_string(body)
-                options["target_name"] = get_string(body)
+                options["keyspace_name"] = decode_string(body)
+                options["target_name"] = decode_string(body)
             elif target in (SchemaChangeTarget.FUNCTION, SchemaChangeTarget.AGGREGATE):
-                options["keyspace_name"] = get_string(body)
-                options["target_name"] = get_string(body)
-                options["argument_types"] = get_strings_list(body)
+                options["keyspace_name"] = decode_string(body)
+                options["target_name"] = decode_string(body)
+                options["argument_types"] = decode_strings_list(body)
             else:
                 raise InternalDriverError(
                     f"unhandled target={target} with body={body.show()!r}"

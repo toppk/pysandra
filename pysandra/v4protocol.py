@@ -139,9 +139,7 @@ class V4Protocol(Protocol):
             )
 
         if not sbytes_body.at_end():
-            raise InternalDriverError(
-                f"still data left remains={sbytes_body.show()!r}"
-            )
+            raise InternalDriverError(f"still data left remains={sbytes_body.show()!r}")
         return self.respond(request, response)
 
     def respond(
