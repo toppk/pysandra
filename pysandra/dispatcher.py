@@ -3,6 +3,7 @@ import sys
 import traceback
 from typing import Callable, Dict, Optional, Tuple, Union
 
+from .constants import EVENT_STREAM_ID
 from .exceptions import InternalDriverError, MaximumStreamsException, ServerError
 from .protocol import ErrorMessage, Protocol, RequestMessage  # noqa: F401
 from .types import ExpectedResponses  # noqa: F401
@@ -95,19 +96,24 @@ class Dispatcher:
         assert self._reader is not None
         head = await self._reader.read(9)
         logger.debug(f"in _receive head={head!r}")
-        version, flags, stream, opcode, length = self._proto.decode_header(head)
+        version, flags, stream_id, opcode, length = self._proto.decode_header(head)
         body = await self._reader.read(length)
-        request, response_handler, event = self._rm_stream_id(stream)
-        # exceptions are stashed here (in the wrong task)
-        try:
-            self._data[event] = response_handler(
-                request, version, flags, stream, opcode, length, body
+        if stream_id == EVENT_STREAM_ID:
+            await self._proto.event_handler(
+                version, flags, stream_id, opcode, length, body
             )
-        except ServerError as e:
-            self._data[event] = e
-        except InternalDriverError as e:
-            self._data[event] = e
-        event.set()
+        else:
+            request, response_handler, event = self._rm_stream_id(stream_id)
+            # exceptions are stashed here (in the wrong task)
+            try:
+                self._data[event] = response_handler(
+                    request, version, flags, stream_id, opcode, length, body
+                )
+            except ServerError as e:
+                self._data[event] = e
+            except InternalDriverError as e:
+                self._data[event] = e
+            event.set()
 
     def retrieve(self, event: "asyncio.Event") -> "ExpectedResponses":
         try:
@@ -156,8 +162,9 @@ class Dispatcher:
 
 
 if __name__ == "__main__":
+    from .v4protocol import V4Protocol
 
-    client = Dispatcher()
+    client = Dispatcher(protocol=V4Protocol())
     move = 0
     while True:
         move += 1
@@ -167,6 +174,10 @@ if __name__ == "__main__":
             print(len(client._streams))
             raise e
         print("got new streamid=%s" % streamid)
+        client._update_stream_id(
+            streamid,
+            (RequestMessage(0, 0, 0), client._proto.build_response, asyncio.Event()),
+        )
         if (move % 19) == 0:
 
             print("remove streamid = %s" % streamid)

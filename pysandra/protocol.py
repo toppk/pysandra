@@ -3,6 +3,7 @@ from struct import Struct, pack, unpack
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 from .constants import (
+    SERVER_SENT,
     Consitency,
     ErrorCode,
     Events,
@@ -18,8 +19,9 @@ from .exceptions import (
     InternalDriverError,
     TypeViolation,
     UnknownPayloadException,
+    VersionMismatchException,
 )
-from .types import ExpectedResponses, Rows, SchemaChange, SchemaChangeType
+from .types import ChangeEvent, ExpectedResponses, Rows, SchemaChange, SchemaChangeType
 from .utils import SBytes, get_logger
 
 logger = get_logger(__name__)
@@ -86,7 +88,8 @@ class STypes(str, Enum):
     NetOrder = "!"
     INT = "l"
     LONG = "q"
-    SHORT = "H"
+    SHORT = "h"
+    USHORT = "H"
     BYTE = "B"
     CHAR = "s"
 
@@ -98,10 +101,10 @@ def get_struct(fmt: str) -> Struct:
     global structs
     if len(structs) == 0:
         formats = [
-            f"{NETWORK_ORDER}{STypes.SHORT}",
+            f"{NETWORK_ORDER}{STypes.USHORT}",
             f"{NETWORK_ORDER}{STypes.INT}",
             f"{NETWORK_ORDER}{STypes.BYTE}{STypes.BYTE}{STypes.SHORT}{STypes.BYTE}{STypes.INT}",
-            f"{NETWORK_ORDER}{STypes.SHORT}{STypes.BYTE}",
+            f"{NETWORK_ORDER}{STypes.USHORT}{STypes.BYTE}",
         ]
         for frmt in formats:
             structs[frmt] = Struct(frmt)
@@ -114,7 +117,7 @@ def get_struct(fmt: str) -> Struct:
 
 
 def encode_short(value: int) -> bytes:
-    return get_struct(f"{NETWORK_ORDER}{STypes.SHORT}").pack(value)
+    return get_struct(f"{NETWORK_ORDER}{STypes.USHORT}").pack(value)
 
 
 def encode_int(value: int) -> bytes:
@@ -152,7 +155,7 @@ def encode_strings_list(values: List[str]) -> bytes:
 
 
 def decode_short(sbytes: "SBytes") -> int:
-    return unpack(f"{NETWORK_ORDER}{STypes.SHORT}", sbytes.show(2))[0]
+    return unpack(f"{NETWORK_ORDER}{STypes.USHORT}", sbytes.show(2))[0]
 
 
 def decode_int(sbytes: "SBytes") -> int:
@@ -188,11 +191,35 @@ def decode_strings_list(sbytes: "SBytes") -> List[str]:
 
 
 class Protocol:
+    version: int
+
     def decode_header(self, header: bytes) -> Tuple[int, int, int, int, int]:
-        pass
+        version, flags, stream, opcode, length = get_struct(
+            f"{NETWORK_ORDER}{STypes.BYTE}{STypes.BYTE}{STypes.SHORT}{STypes.BYTE}{STypes.INT}"
+        ).unpack(header)
+        logger.debug(
+            f"got head={header!r} containing version={version:x} flags={flags:x} stream={stream:x} opcode={opcode:x} length={length:x}"
+        )
+        expected_version = SERVER_SENT | self.version
+        if version != expected_version:
+            raise VersionMismatchException(
+                f"received version={version:x} instead of expected_version={expected_version}"
+            )
+        return version, flags, stream, opcode, length
 
     def startup(self, stream_id: int = None, params: dict = None) -> "StartupMessage":
         pass
+
+    async def event_handler(
+        self,
+        version: int,
+        flags: int,
+        stream_id: int,
+        opcode: int,
+        length: int,
+        body: bytes,
+    ) -> None:
+        raise InternalDriverError("subclass should implement method")
 
     def build_response(
         self,
@@ -204,19 +231,19 @@ class Protocol:
         length: int,
         body: bytes,
     ) -> "ExpectedResponses":
-        pass
+        raise InternalDriverError("subclass should implement method")
 
     def query(self, stream_id: int = None, params: dict = None) -> "QueryMessage":
-        pass
+        raise InternalDriverError("subclass should implement method")
 
     def execute(self, stream_id: int = None, params: dict = None) -> "ExecuteMessage":
-        pass
+        raise InternalDriverError("subclass should implement method")
 
     def prepare(self, stream_id: int = None, params: dict = None) -> "PrepareMessage":
-        pass
+        raise InternalDriverError("subclass should implement method")
 
     def register(self, stream_id: int = None, params: dict = None) -> "RegisterMessage":
-        pass
+        raise InternalDriverError("subclass should implement method")
 
 
 class BaseMessage:
@@ -238,7 +265,7 @@ class RequestMessage(BaseMessage):
         return header + body
 
     def encode_body(self) -> bytes:
-        raise InternalDriverError("this method should be overwritten in subclass")
+        raise InternalDriverError("subclass should implement method")
 
     def encode_header(self, body_length: int) -> bytes:
         return get_struct(
@@ -258,7 +285,7 @@ class ResponseMessage(BaseMessage):
     def build(
         version: int, flags: int, stream_id: int, body: "SBytes"
     ) -> "ResponseMessage":
-        raise InternalDriverError("subclass should implement build() method")
+        raise InternalDriverError("subclass should implement method")
 
 
 class ReadyMessage(ResponseMessage):
@@ -318,6 +345,75 @@ class ErrorMessage(ResponseMessage):
         return ErrorMessage(error_code, error_text, details, version, flags, stream_id)
 
 
+class EventMessage(ResponseMessage):
+    opcode = Opcode.RESULT
+
+    def __init__(self, event_type: "Events", event: "ChangeEvent", *args: Any) -> None:
+        super().__init__(*args)
+        self.event_type = event_type
+        self.event = event
+
+    @staticmethod
+    def decode_schema_change(body: "SBytes") -> "SchemaChange":
+        # <change_type>
+        try:
+            string = decode_string(body)
+            change_type = SchemaChangeType(string)
+        except ValueError:
+            raise UnknownPayloadException(f"got unexpected change_type={change_type}")
+        # <target>
+        try:
+            string = decode_string(body)
+            target = SchemaChangeTarget(string)
+        except ValueError:
+            raise UnknownPayloadException(f"got unexpected target={target}")
+        # <options>
+        options: Dict[str, Union[str, List[str]]] = {}
+        if target == SchemaChangeTarget.KEYSPACE:
+            options["target_name"] = decode_string(body)
+        elif target in (SchemaChangeTarget.TABLE, SchemaChangeTarget.TYPE):
+            options["keyspace_name"] = decode_string(body)
+            options["target_name"] = decode_string(body)
+        elif target in (SchemaChangeTarget.FUNCTION, SchemaChangeTarget.AGGREGATE):
+            options["keyspace_name"] = decode_string(body)
+            options["target_name"] = decode_string(body)
+            options["argument_types"] = decode_strings_list(body)
+        else:
+            raise InternalDriverError(
+                f"unhandled target={target} with body={body.show()!r}"
+            )
+
+        logger.debug(
+            f"SCHEMA_CHANGE change_type={change_type} target={target} options={options}"
+        )
+        return SchemaChange(change_type, target, options)
+
+    @staticmethod
+    def build(
+        version: int, flags: int, stream_id: int, body: "SBytes",
+    ) -> "EventMessage":
+        event = decode_string(body)
+        try:
+            event_type = Events(event)
+        except ValueError:
+            raise UnknownPayloadException(f"got unexpected event={event}")
+        if event_type == Events.TOPOLOGY_CHANGE:
+            pass
+        elif event_type == Events.STATUS_CHANGE:
+            pass
+        elif event_type == Events.SCHEMA_CHANGE:
+            event_obj = EventMessage.decode_schema_change(body)
+
+        if event_obj is None:
+            raise InternalDriverError(
+                "didn't create and Event for event_type={event_type}"
+            )
+
+        logger.debug(f"EventResponse body={body!r}")
+
+        return EventMessage(event_type, event_obj, version, flags, stream_id)
+
+
 class ResultMessage(ResponseMessage):
     opcode = Opcode.RESULT
 
@@ -373,7 +469,7 @@ class ResultMessage(ResponseMessage):
             if pk_count > 0:
                 pk_index = list(
                     unpack(
-                        f"{NETWORK_ORDER}{STypes.SHORT * pk_count}",
+                        f"{NETWORK_ORDER}{STypes.USHORT * pk_count}",
                         body.show(2 * pk_count),
                     )
                 )
@@ -423,40 +519,7 @@ class ResultMessage(ResponseMessage):
                 statement_id, col_specs, kind, version, flags, stream_id
             )
         elif kind == Kind.SCHEMA_CHANGE:
-            # <change_type>
-            try:
-                string = decode_string(body)
-                change_type = SchemaChangeType(string)
-            except ValueError:
-                raise UnknownPayloadException(
-                    f"got unexpected change_type={change_type}"
-                )
-            # <target>
-            try:
-                string = decode_string(body)
-                target = SchemaChangeTarget(string)
-            except ValueError:
-                raise UnknownPayloadException(f"got unexpected target={target}")
-            # <options>
-            options: Dict[str, Union[str, List[str]]] = {}
-            if target == SchemaChangeTarget.KEYSPACE:
-                options["target_name"] = decode_string(body)
-            elif target in (SchemaChangeTarget.TABLE, SchemaChangeTarget.TYPE):
-                options["keyspace_name"] = decode_string(body)
-                options["target_name"] = decode_string(body)
-            elif target in (SchemaChangeTarget.FUNCTION, SchemaChangeTarget.AGGREGATE):
-                options["keyspace_name"] = decode_string(body)
-                options["target_name"] = decode_string(body)
-                options["argument_types"] = decode_strings_list(body)
-            else:
-                raise InternalDriverError(
-                    f"unhandled target={target} with body={body.show()!r}"
-                )
-
-            print(
-                f"SCHEMA_CHANGE change_type={change_type} target={target} options={options}"
-            )
-            schema_change = SchemaChange(change_type, target, options)
+            schema_change = EventMessage.decode_schema_change(body)
             msg = SchemaResultMessage(schema_change, kind, version, flags, stream_id)
         else:
             raise UnknownPayloadException(f"RESULT message has unknown kind={kind}")
@@ -500,7 +563,7 @@ class StartupMessage(RequestMessage):
         self.options = options
 
     def encode_body(self) -> bytes:
-        body = get_struct(f"{NETWORK_ORDER}{STypes.SHORT}").pack(len(self.options))
+        body = get_struct(f"{NETWORK_ORDER}{STypes.USHORT}").pack(len(self.options))
         for key, value in self.options.items():
             body += encode_string(key) + encode_string(value)
         return body
@@ -527,12 +590,12 @@ class ExecuteMessage(RequestMessage):
         body = encode_string(self.query_id)
         #   <query_parameters>
         #     <consistency><flags>
-        body += get_struct(f"{NETWORK_ORDER}{STypes.SHORT}{STypes.BYTE}").pack(
+        body += get_struct(f"{NETWORK_ORDER}{STypes.USHORT}{STypes.BYTE}").pack(
             Consitency.ONE, QueryFlags.VALUES
         )
         #     [<n>[name_1]<value_1>...[name_n]<value_n>][<result_page_size>][<paging_state>][<serial_consistency>][<timestamp>]
         # <n>
-        body += get_struct(f"{NETWORK_ORDER}{STypes.SHORT}").pack(len(self.col_specs))
+        body += get_struct(f"{NETWORK_ORDER}{STypes.USHORT}").pack(len(self.col_specs))
         for value, spec in zip(self.query_params, self.col_specs):
             if spec["option_id"] == OptionID.INT:
                 body += pack(f"{NETWORK_ORDER}{STypes.INT}{STypes.INT}", 4, value)
@@ -555,7 +618,7 @@ class QueryMessage(RequestMessage):
     def encode_body(self) -> bytes:
         body = encode_long_string(self.query)
         #   <consistency><flags>[<n>[name_1]<value_1>...[name_n]<value_n>][<result_page_size>][<paging_state>][<serial_consistency>][<timestamp>][<keyspace>][<now_in_seconds>]
-        body += get_struct(f"{NETWORK_ORDER}{STypes.SHORT}{STypes.BYTE}").pack(
+        body += get_struct(f"{NETWORK_ORDER}{STypes.USHORT}{STypes.BYTE}").pack(
             Consitency.ONE, QueryFlags.SKIP_METADATA
         )
         # query_body += pack("!HL", Consitency.ONE, 0x0002)

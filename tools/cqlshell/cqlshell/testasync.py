@@ -3,6 +3,7 @@
 import argparse
 import asyncio
 import sys
+from signal import Signals
 
 from pysandra import Client, Events, exceptions
 from pysandra.types import Rows, SchemaChange
@@ -24,7 +25,8 @@ class Tester:
         if isinstance(resp, asyncio.Queue):
             print(f"========> LISTENING for events")
             while True:
-                pass
+                data = await resp.get()
+                print(f">>> got {data}")
         # will never end
         print(f"========> FINISHED")
 
@@ -97,7 +99,7 @@ async def run(command, stop=False):
     if command not in ("ddl", "dml", "full", "dupddl", "events"):
         print(f"ERROR:unknown command={command}")
         sys.exit(1)
-    tester = Tester(Client())
+    tester = Tester(Client(debug_signal=Signals.SIGUSR1))
     await tester.connect()
     if command in ("ddl", "full",):
         await test_ddl(tester)
@@ -118,3 +120,4 @@ if __name__ == "__main__":
     parser.set_defaults(stop=False)
     args = parser.parse_args()
     asyncio.run(run(args.command, args.stop))
+    print("finished")

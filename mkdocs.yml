@@ -12,6 +12,7 @@ nav:
     - Introduction: 'index.md'
     - Developing: 'developing.md'
     - Contributors: 'contributors.md'
+    - Protocol: 'protocol.md'
     - V4 Spec: 'native_protocol_v4.spec.txt'
     - V5 Spec: 'native_protocol_v5.spec.txt'
 

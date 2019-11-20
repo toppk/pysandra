@@ -1,9 +1,11 @@
 import asyncio
-from typing import List, Tuple
+from os import getpid
+from signal import Signals
+from typing import List, Optional, Tuple
 
 from .constants import REQUEST_TIMEOUT, STARTUP_TIMEOUT, Events  # noqa: F401
 from .dispatcher import Dispatcher
-from .exceptions import RequestTimeout, StartupTimeout
+from .exceptions import RequestTimeout, StartupTimeout, TypeViolation
 from .protocol import Protocol
 from .types import ExpectedResponses  # noqa: F401
 from .utils import get_logger
@@ -13,12 +15,32 @@ logger = get_logger(__name__)
 
 
 class Client:
-    def __init__(self) -> None:
+    def __init__(self, debug_signal: Optional["Signals"] = None) -> None:
         self._proto = V4Protocol()
         self._dispatcher = Dispatcher(protocol=self._proto, **default_host())
         self._is_ready = False
         self._in_startup = False
         self._is_ready_event = asyncio.Event()
+        if debug_signal is not None:
+            self._install_signal(debug_signal)
+
+    def _dump_state(self) -> None:
+        logger.debug("in signal handler")
+
+    def _install_signal(self, debug_signal: "Signals") -> None:
+        if isinstance(debug_signal, Signals):
+            signal = debug_signal
+        elif isinstance(signal, str):
+            try:
+                signal = Signals(debug_signal)
+            except ValueError:
+                raise TypeViolation(
+                    f"signal={debug_signal} is not valid.  Please use signal.SIG*"
+                )
+
+        loop = asyncio.get_event_loop()
+        logger.debug(f" adding debug handler at signal={signal!r} for pid={getpid()}")
+        loop.add_signal_handler(signal, self._dump_state)
 
     @property
     def protocol(self) -> "Protocol":

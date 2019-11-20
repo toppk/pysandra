@@ -1,15 +1,12 @@
-from typing import Callable, Dict, Optional, Tuple
+from asyncio import Queue
+from typing import Callable, Dict, Optional
 
-from .constants import CQL_VERSION, SERVER_SENT, Opcode, Options
+from .constants import CQL_VERSION, Opcode, Options
 from .exceptions import ServerError  # noqa: F401
-from .exceptions import (
-    InternalDriverError,
-    UnknownPayloadException,
-    VersionMismatchException,
-)
+from .exceptions import InternalDriverError, UnknownPayloadException
 from .protocol import (
-    NETWORK_ORDER,
     ErrorMessage,
+    EventMessage,
     ExecuteMessage,
     PreparedResultMessage,
     PrepareMessage,
@@ -23,9 +20,7 @@ from .protocol import (
     RowsResultMessage,
     SchemaResultMessage,
     StartupMessage,
-    STypes,
     VoidResultMessage,
-    get_struct,
 )
 from .types import ExpectedResponses  # noqa: F401
 from .utils import SBytes, get_logger
@@ -39,6 +34,7 @@ class V4Protocol(Protocol):
     def __init__(self, default_flags: int = 0x00) -> None:
         self._default_flags = default_flags
         self._prepared: Dict[bytes, "PreparedResultMessage"] = {}
+        self._events: Optional["Queue"] = None
 
     def reset_connection(self) -> None:
         self._prepared = {}
@@ -84,6 +80,23 @@ class V4Protocol(Protocol):
             self.flags(),
             stream_id,
         )
+
+    async def event_handler(
+        self,
+        version: int,
+        flags: int,
+        stream_id: int,
+        opcode: int,
+        length: int,
+        body: bytes,
+    ) -> None:
+        if self._events is None:
+            raise InternalDriverError(f"got event={body!r} when no registered occured")
+        sbytes_body = SBytes(body)
+        msg = EventMessage.build(version, flags, stream_id, sbytes_body)
+        if not sbytes_body.at_end():
+            raise InternalDriverError(f"still data left remains={sbytes_body.show()!r}")
+        await self._events.put(msg.event)
 
     def build_response(
         self,
@@ -146,6 +159,11 @@ class V4Protocol(Protocol):
                     return response.rows
                 elif isinstance(response, SchemaResultMessage):
                     return response.schema_change
+        elif request.opcode == Opcode.REGISTER:
+            if response.opcode == Opcode.READY:
+                if self._events is None:
+                    self._events = Queue()
+                return self._events
         elif request.opcode == Opcode.PREPARE:
             if response.opcode == Opcode.RESULT:
                 if isinstance(response, PreparedResultMessage):
@@ -157,19 +175,5 @@ class V4Protocol(Protocol):
                     return True
 
         raise InternalDriverError(
-            f"unhandled response={response} for request={request}"
+            f"unhandled response={response.opcode!r} for request={request.opcode!r}"
         )
-
-    def decode_header(self, header: bytes) -> Tuple[int, int, int, int, int]:
-        version, flags, stream, opcode, length = get_struct(
-            f"{NETWORK_ORDER}{STypes.BYTE}{STypes.BYTE}{STypes.SHORT}{STypes.BYTE}{STypes.INT}"
-        ).unpack(header)
-        logger.debug(
-            f"got head={header!r} containing version={version:x} flags={flags:x} stream={stream:x} opcode={opcode:x} length={length:x}"
-        )
-        expected_version = SERVER_SENT | self.version
-        if version != expected_version:
-            raise VersionMismatchException(
-                f"received version={version:x} instead of expected_version={expected_version}"
-            )
-        return version, flags, stream, opcode, length

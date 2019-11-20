@@ -11,6 +11,7 @@ REQUEST_TIMEOUT = 10
 
 CQL_VERSION = "3.0.0"
 SERVER_SENT = 0x80
+EVENT_STREAM_ID = -1
 
 
 class Opcode(int, Enum):

@@ -18,7 +18,11 @@ class AsciiType(BaseType):
     pass
 
 
-class SchemaChange:
+class ChangeEvent:
+    pass
+
+
+class SchemaChange(ChangeEvent):
     def __init__(
         self,
         change_type: "SchemaChangeType",
