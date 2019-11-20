@@ -1,10 +1,10 @@
 
 
-Status
+=== Status
 
   1. Overview - done
   2. Frame header - mostly
-    2.1. version - done
+    2.1. version - done (see notes below)
     2.2. flags - partial
     2.3. stream - done (see notes below)
     2.4. opcode - done
@@ -14,7 +14,7 @@ Status
     4.1. Requests - parial
       4.1.1. STARTUP - done
       4.1.2. AUTH_RESPONSE - not done
-      4.1.3. OPTIONS - not done
+      4.1.3. OPTIONS - done (see notes below)
       4.1.4. QUERY - mostly
       4.1.5. PREPARE - mostly
       4.1.6. EXECUTE - mostly
@@ -24,7 +24,7 @@ Status
       4.2.1. ERROR - partial
       4.2.2. READY - done
       4.2.3. AUTHENTICATE - not done
-      4.2.4. SUPPORTED - not done
+      4.2.4. SUPPORTED - done (see notes below)
       4.2.5. RESULT - partial 
         4.2.5.1. Void - done
         4.2.5.2. Rows - done
@@ -34,7 +34,7 @@ Status
       4.2.6. EVENT - partial
       4.2.7. AUTH_CHALLENGE - not done
       4.2.8. AUTH_SUCCESS - not done
-  5. Compression - done
+  5. Compression - not done
   6. Data Type Serialization Formats - not done
   7. User Defined Type Serialization - not done
   8. Result paging - not done
@@ -43,9 +43,14 @@ Status
 
 
 
-Here are some thoughts on the protocol specification (currently using v4)
+=== Here are some thoughts on the protocol specification (currently using v4)
 
 stream (sec 2.3) is listed as [short] which is a 2 byte unsigned value (sec 3.) , but has a maximum value of
 2 ** 15 (sec 2.3) and can contain a flag value of -1 (sec 2.3 & sec 4.2.6)
 
 How to remove registration
+
+What is the license for the protocol documents?
+
+if options returns supoported method options={'PROTOCOL_VERSIONS': ['3/v3', '4/v4', '5/v5-beta'], 'COMPRESSION': ['snappy', 'lz4'], 'CQL_VERSION': ['3.4.4']}
+What is the correct CQL_VERSION (sec. 4.1.1).  If you send options first, what protocol_version should you used (sec 2.1)

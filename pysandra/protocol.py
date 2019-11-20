@@ -190,6 +190,16 @@ def decode_strings_list(sbytes: "SBytes") -> List[str]:
     return string_list
 
 
+def decode_string_multimap(sbytes: "SBytes") -> Dict[str, List[str]]:
+    num_entries = decode_short(sbytes)
+    multimap: Dict[str, List[str]] = {}
+    for _cnt in range(num_entries):
+        key = decode_string(sbytes)
+        values = decode_strings_list(sbytes)
+        multimap[key] = values
+    return multimap
+
+
 class Protocol:
     version: int
 
@@ -206,9 +216,6 @@ class Protocol:
                 f"received version={version:x} instead of expected_version={expected_version}"
             )
         return version, flags, stream, opcode, length
-
-    def startup(self, stream_id: int = None, params: dict = None) -> "StartupMessage":
-        pass
 
     async def event_handler(
         self,
@@ -233,16 +240,22 @@ class Protocol:
     ) -> "ExpectedResponses":
         raise InternalDriverError("subclass should implement method")
 
-    def query(self, stream_id: int = None, params: dict = None) -> "QueryMessage":
+    def startup(self, stream_id: int, params: dict) -> "StartupMessage":
         raise InternalDriverError("subclass should implement method")
 
-    def execute(self, stream_id: int = None, params: dict = None) -> "ExecuteMessage":
+    def query(self, stream_id: int, params: dict) -> "QueryMessage":
         raise InternalDriverError("subclass should implement method")
 
-    def prepare(self, stream_id: int = None, params: dict = None) -> "PrepareMessage":
+    def execute(self, stream_id: int, params: dict) -> "ExecuteMessage":
         raise InternalDriverError("subclass should implement method")
 
-    def register(self, stream_id: int = None, params: dict = None) -> "RegisterMessage":
+    def prepare(self, stream_id: int, params: dict) -> "PrepareMessage":
+        raise InternalDriverError("subclass should implement method")
+
+    def options(self, stream_id: int, params: dict) -> "OptionsMessage":
+        raise InternalDriverError("subclass should implement method")
+
+    def register(self, stream_id: int, params: dict) -> "RegisterMessage":
         raise InternalDriverError("subclass should implement method")
 
 
@@ -265,7 +278,7 @@ class RequestMessage(BaseMessage):
         return header + body
 
     def encode_body(self) -> bytes:
-        raise InternalDriverError("subclass should implement method")
+        return b""
 
     def encode_header(self, body_length: int) -> bytes:
         return get_struct(
@@ -297,6 +310,22 @@ class ReadyMessage(ResponseMessage):
     ) -> "ReadyMessage":
         logger.debug(f"ReadyResponse body={body!r}")
         return ReadyMessage(version, flags, stream_id)
+
+
+class SupportedMessage(ResponseMessage):
+    opcode = Opcode.SUPPORTED
+
+    def __init__(self, options: Dict[str, List[str]], *args: Any) -> None:
+        super().__init__(*args)
+        self.options: Dict[str, List[str]] = options
+
+    @staticmethod
+    def build(
+        version: int, flags: int, stream_id: int, body: "SBytes"
+    ) -> "SupportedMessage":
+        options = decode_string_multimap(body)
+        logger.debug(f"SupportedResponse options={options} body={body!r}")
+        return SupportedMessage(options, version, flags, stream_id)
 
 
 class ErrorMessage(ResponseMessage):
@@ -567,6 +596,10 @@ class StartupMessage(RequestMessage):
         for key, value in self.options.items():
             body += encode_string(key) + encode_string(value)
         return body
+
+
+class OptionsMessage(RequestMessage):
+    opcode = Opcode.OPTIONS
 
 
 class ExecuteMessage(RequestMessage):

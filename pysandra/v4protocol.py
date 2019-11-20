@@ -1,13 +1,14 @@
 from asyncio import Queue
 from typing import Callable, Dict, Optional
 
-from .constants import CQL_VERSION, Opcode, Options
+from .constants import Opcode
 from .exceptions import ServerError  # noqa: F401
 from .exceptions import InternalDriverError, UnknownPayloadException
 from .protocol import (
     ErrorMessage,
     EventMessage,
     ExecuteMessage,
+    OptionsMessage,
     PreparedResultMessage,
     PrepareMessage,
     Protocol,
@@ -20,6 +21,7 @@ from .protocol import (
     RowsResultMessage,
     SchemaResultMessage,
     StartupMessage,
+    SupportedMessage,
     VoidResultMessage,
 )
 from .types import ExpectedResponses  # noqa: F401
@@ -39,31 +41,30 @@ class V4Protocol(Protocol):
     def reset_connection(self) -> None:
         self._prepared = {}
 
-    @property
-    def options(self) -> dict:
-        return {Options.CQL_VERSION: CQL_VERSION}
-
     def flags(self, flags: int = None) -> int:
         if flags is None:
             flags = self._default_flags
         return flags
 
-    def startup(self, stream_id: int = None, params: dict = None) -> "StartupMessage":
-        return StartupMessage(self.options, self.version, self.flags(), stream_id)
+    def options(self, stream_id: int, params: dict) -> "OptionsMessage":
+        return OptionsMessage(self.version, self.flags(), stream_id)
 
-    def query(self, stream_id: int = None, params: dict = None) -> "QueryMessage":
+    def startup(self, stream_id: int, params: dict) -> "StartupMessage":
+        return StartupMessage(params["options"], self.version, self.flags(), stream_id)
+
+    def query(self, stream_id: int, params: dict) -> "QueryMessage":
         assert params is not None
         return QueryMessage(params["query"], self.version, self.flags(), stream_id,)
 
-    def register(self, stream_id: int = None, params: dict = None) -> "RegisterMessage":
+    def register(self, stream_id: int, params: dict) -> "RegisterMessage":
         assert params is not None
         return RegisterMessage(params["events"], self.version, self.flags(), stream_id,)
 
-    def prepare(self, stream_id: int = None, params: dict = None) -> "PrepareMessage":
+    def prepare(self, stream_id: int, params: dict) -> "PrepareMessage":
         assert params is not None
         return PrepareMessage(params["query"], self.version, self.flags(), stream_id,)
 
-    def execute(self, stream_id: int = None, params: dict = None) -> "ExecuteMessage":
+    def execute(self, stream_id: int, params: dict) -> "ExecuteMessage":
         assert params is not None
         statement_id = params["statement_id"]
         if statement_id not in self._prepared:
@@ -104,13 +105,17 @@ class V4Protocol(Protocol):
         version: int,
         flags: int,
         stream_id: int,
-        opcode: int,
+        opcode_int: int,
         length: int,
         body: bytes,
     ) -> "ExpectedResponses":
         sbytes_body = SBytes(body)
         response: Optional["ResponseMessage"] = None
         factory: Optional[Callable] = None
+        try:
+            opcode = Opcode(opcode_int)
+        except ValueError:
+            raise InternalDriverError(f"unknown optcode={opcode_int}")
         if opcode == Opcode.ERROR:
             factory = ErrorMessage.build
         elif opcode == Opcode.READY:
@@ -118,7 +123,7 @@ class V4Protocol(Protocol):
         elif opcode == Opcode.AUTHENTICATE:
             pass
         elif opcode == Opcode.SUPPORTED:
-            pass
+            factory = SupportedMessage.build
         elif opcode == Opcode.RESULT:
             factory = ResultMessage.build
         elif opcode == Opcode.EVENT:
@@ -128,7 +133,7 @@ class V4Protocol(Protocol):
         elif opcode == Opcode.AUTH_SUCCESS:
             pass
         if factory is None:
-            raise UnknownPayloadException(f"unhandled message opcode={opcode}")
+            raise UnknownPayloadException(f"unhandled message opcode={opcode!r}")
         response = factory(version, flags, stream_id, sbytes_body)
         if response is None:
             raise InternalDriverError(
@@ -159,6 +164,10 @@ class V4Protocol(Protocol):
                     return response.rows
                 elif isinstance(response, SchemaResultMessage):
                     return response.schema_change
+        elif request.opcode == Opcode.OPTIONS:
+            if response.opcode == Opcode.SUPPORTED:
+                assert isinstance(response, SupportedMessage)
+                return response.options
         elif request.opcode == Opcode.REGISTER:
             if response.opcode == Opcode.READY:
                 if self._events is None:

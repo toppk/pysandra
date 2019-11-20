@@ -13,6 +13,10 @@ CQL_VERSION = "3.0.0"
 SERVER_SENT = 0x80
 EVENT_STREAM_ID = -1
 
+# connection
+DEFAULT_HOST = "127.0.0.1"
+DEFAULT_PORT = 9042
+
 
 class Opcode(int, Enum):
     ERROR = 0x00

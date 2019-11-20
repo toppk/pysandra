@@ -7,7 +7,7 @@ from .constants import REQUEST_TIMEOUT, STARTUP_TIMEOUT, Events  # noqa: F401
 from .dispatcher import Dispatcher
 from .exceptions import RequestTimeout, StartupTimeout, TypeViolation
 from .protocol import Protocol
-from .types import ExpectedResponses  # noqa: F401
+from .types import Connection, ExpectedResponses  # noqa: F401
 from .utils import get_logger
 from .v4protocol import V4Protocol
 
@@ -17,7 +17,8 @@ logger = get_logger(__name__)
 class Client:
     def __init__(self, debug_signal: Optional["Signals"] = None) -> None:
         self._proto = V4Protocol()
-        self._dispatcher = Dispatcher(protocol=self._proto, **default_host())
+        self._conn = Connection()
+        self._dispatcher = Dispatcher(self._proto, self._conn)
         self._is_ready = False
         self._in_startup = False
         self._is_ready_event = asyncio.Event()
@@ -60,9 +61,21 @@ class Client:
         if self._in_startup:
             return
         self._in_startup = True
-        logger.debug(" in _startup")
+        logger.debug(" sending Options")
         event = await self._dispatcher.send(
-            self.protocol.startup, self.protocol.build_response
+            self.protocol.options, self.protocol.build_response
+        )
+        try:
+            await asyncio.wait_for(event.wait(), timeout=REQUEST_TIMEOUT)
+        except asyncio.TimeoutError as e:
+            raise RequestTimeout(e) from None
+        options = self._dispatcher.retrieve(event)
+        assert isinstance(options, dict)
+        self._conn.supported_options = options
+        logger.debug(f" sending Startup options={options}")
+        params = {"options": self._conn.options}
+        event = await self._dispatcher.send(
+            self.protocol.startup, self.protocol.build_response, params=params
         )
         try:
             await asyncio.wait_for(event.wait(), timeout=REQUEST_TIMEOUT)
@@ -132,7 +145,3 @@ class Client:
             return resp
         except asyncio.TimeoutError as e:
             raise RequestTimeout(e) from None
-
-
-def default_host() -> dict:
-    return {"host": "127.0.0.1", "port": 9042}

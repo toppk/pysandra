@@ -1,9 +1,18 @@
 from asyncio import Queue  # noqa
-from typing import Any, List, Optional, Union  # noqa
+from typing import Any, Dict, List, Optional, Union  # noqa
 
-from .constants import SchemaChangeTarget, SchemaChangeType
+from .constants import (
+    CQL_VERSION,
+    DEFAULT_HOST,
+    DEFAULT_PORT,
+    Options,
+    SchemaChangeTarget,
+    SchemaChangeType,
+)
 
-ExpectedResponses = Union[bool, "Rows", bytes, "SchemaChange", "Queue[Any]"]
+ExpectedResponses = Union[
+    bool, "Rows", bytes, "SchemaChange", "Queue[Any]", Dict[str, List[str]]
+]
 
 
 class BaseType:
@@ -66,3 +75,29 @@ if __name__ == "__main__":
         print(f"got row={row}")
     for row in d:
         print(f"got row={row}")
+
+
+class Connection:
+    def __init__(
+        self,
+        host: str = None,
+        port: int = None,
+        options: Optional[Dict[str, str]] = None,
+    ) -> None:
+        if options is None:
+            options = {Options.CQL_VERSION: CQL_VERSION}
+        if host is None:
+            host = DEFAULT_HOST
+        if port is None:
+            port = DEFAULT_PORT
+        self.host = host
+        self.port = port
+        self._options = options
+        self.supported_options: Optional[Dict[str, List[str]]] = None
+
+    @property
+    def options(self) -> Dict[str, str]:
+        if self.supported_options is not None:
+            # check options
+            pass
+        return self._options

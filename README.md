@@ -37,7 +37,10 @@ Things that exist:
 
 * asyncio interface
 * basic DML query (all results are just bytes at the moment)
+* basic DDL query
 * basic prepared statements
+* ...
+* see protocol.md for more details
 
 Things that don't exist:
 * any authnetication support
@@ -54,7 +57,7 @@ Things that don't exist:
 ## Goals
 
 * cassandra client driver for asyncio based applications
-* allow doing anything the wire protocol allows
+* allow doing anything the wire protocol allows and servers tolerate
 
 ## Implementation
 
@@ -72,6 +75,7 @@ Aims to be:
 * Tests
 * TLS
 * AUTH
+* cqlshell
 
 ## Developing
 

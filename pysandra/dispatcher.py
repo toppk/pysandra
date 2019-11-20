@@ -6,18 +6,15 @@ from typing import Callable, Dict, Optional, Tuple, Union
 from .constants import EVENT_STREAM_ID
 from .exceptions import InternalDriverError, MaximumStreamsException, ServerError
 from .protocol import ErrorMessage, Protocol, RequestMessage  # noqa: F401
-from .types import ExpectedResponses  # noqa: F401
+from .types import Connection, ExpectedResponses  # noqa: F401
 from .utils import get_logger
 
 logger = get_logger(__name__)
 
 
 class Dispatcher:
-    def __init__(
-        self, host: str = None, port: int = None, protocol: "Protocol" = None
-    ) -> None:
-        self._host = host
-        self._port = port
+    def __init__(self, protocol: "Protocol", connection: "Connection") -> None:
+        self._conn = connection
         assert protocol is not None
         self._proto = protocol
         self._data: Dict[
@@ -85,7 +82,7 @@ class Dispatcher:
             await self._connect()
 
         stream_id = self._new_stream_id()
-        request = request_handler(stream_id=stream_id, params=params)
+        request = request_handler(stream_id, params)
         event = asyncio.Event()
         self._update_stream_id(stream_id, (request, response_handler, event))
         assert self._writer is not None
@@ -141,10 +138,8 @@ class Dispatcher:
             traceback.print_exc(file=sys.stdout)
 
     async def _connect(self) -> None:
-        assert self._host is not None
-        assert self._port is not None
         self._reader, self._writer = await asyncio.open_connection(
-            self._host, self._port
+            self._conn.host, self._conn.port
         )
         self._connected = True
         # avoid create_task for 3.6 compatability
@@ -164,7 +159,7 @@ class Dispatcher:
 if __name__ == "__main__":
     from .v4protocol import V4Protocol
 
-    client = Dispatcher(protocol=V4Protocol())
+    client = Dispatcher(V4Protocol(), Connection())
     move = 0
     while True:
         move += 1
