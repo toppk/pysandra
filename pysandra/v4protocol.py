@@ -20,6 +20,7 @@ from .protocol import (
     ResultMessage,
     RowsResultMessage,
     SchemaResultMessage,
+    SetKeyspaceResultMessage,
     StartupMessage,
     SupportedMessage,
     VoidResultMessage,
@@ -162,6 +163,8 @@ class V4Protocol(Protocol):
                     return True
                 elif isinstance(response, RowsResultMessage):
                     return response.rows
+                elif isinstance(response, SetKeyspaceResultMessage):
+                    return response.keyspace
                 elif isinstance(response, SchemaResultMessage):
                     return response.schema_change
         elif request.opcode == Opcode.OPTIONS:

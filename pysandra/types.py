@@ -11,7 +11,7 @@ from .constants import (
 )
 
 ExpectedResponses = Union[
-    bool, "Rows", bytes, "SchemaChange", "Queue[Any]", Dict[str, List[str]]
+    str, bool, "Rows", bytes, "SchemaChange", "Queue[Any]", Dict[str, List[str]]
 ]
 
 

@@ -40,6 +40,8 @@ class Tester:
             print(f">>> got schema_change={resp}")
         elif isinstance(resp, bool):
             print(f">>> got status={resp}")
+        elif isinstance(resp, str):
+            print(f">>> got state={resp}")
         else:
             raise ValueError(f"unexpected response={resp}")
         print(f"========> FINISHED")
@@ -55,6 +57,15 @@ class Tester:
             else:
                 raise ValueError(f"unexpected response={resp}")
         print(f"========> FINISHED")
+
+
+async def test_use(tester):
+    try:
+        await tester.run_query("SELECT * FROM user where user_id=1")
+    except exceptions.ServerError as e:
+        print(f">>> got ServerError exception={e.msg.error_text}")
+    await tester.run_query("use uprofile")
+    await tester.run_query("SELECT * FROM user where user_id=1")
 
 
 async def test_dml(tester):
@@ -96,7 +107,7 @@ async def test_dupddl(tester):
 
 
 async def run(command, stop=False):
-    if command not in ("ddl", "dml", "full", "dupddl", "events"):
+    if command not in ("ddl", "dml", "full", "dupddl", "events", "use"):
         print(f"ERROR:unknown command={command}")
         sys.exit(1)
     tester = Tester(Client(debug_signal=Signals.SIGUSR1))
@@ -105,6 +116,8 @@ async def run(command, stop=False):
         await test_ddl(tester)
     if command in ("dml", "full",):
         await test_dml(tester)
+    if command in ("use",):
+        await test_use(tester)
     if command in ("dupddl",):
         await test_dupddl(tester)
     if command in ("events",):

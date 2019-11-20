@@ -2,6 +2,8 @@
 
 === Status
 
+==== wireprotocol
+
   1. Overview - done
   2. Frame header - mostly
     2.1. version - done (see notes below)
@@ -28,7 +30,7 @@
       4.2.5. RESULT - partial 
         4.2.5.1. Void - done
         4.2.5.2. Rows - done
-        4.2.5.3. Set_keyspace - not done
+        4.2.5.3. Set_keyspace - done
         4.2.5.4. Prepared - done
         4.2.5.5. Schema_change - done
       4.2.6. EVENT - partial
@@ -41,7 +43,7 @@
   9. Error codes - not done
   10. Changes from v3 - ignored
 
-
+==== cql scope support
 
 === Here are some thoughts on the protocol specification (currently using v4)
 

@@ -481,7 +481,8 @@ class ResultMessage(ResponseMessage):
             msg = RowsResultMessage(rows, kind, version, flags, stream_id)
 
         elif kind == Kind.SET_KEYSPACE:
-            pass
+            keyspace = decode_string(body)
+            msg = SetKeyspaceResultMessage(keyspace, kind, version, flags, stream_id)
         elif kind == Kind.PREPARED:
             # <id>
             statement_id = decode_short_bytes(body)
@@ -557,6 +558,12 @@ class ResultMessage(ResponseMessage):
                 f"ResultResponse no msg generated for body={body!r}"
             )
         return msg
+
+
+class SetKeyspaceResultMessage(ResultMessage):
+    def __init__(self, keyspace: str, *args: Any) -> None:
+        self.keyspace: str = keyspace
+        super().__init__(*args)
 
 
 class RowsResultMessage(ResultMessage):
