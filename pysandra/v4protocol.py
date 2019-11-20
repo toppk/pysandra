@@ -16,6 +16,7 @@ from .protocol import (
     Protocol,
     QueryMessage,
     ReadyMessage,
+    RegisterMessage,
     RequestMessage,
     ResponseMessage,
     ResultMessage,
@@ -57,6 +58,10 @@ class V4Protocol(Protocol):
     def query(self, stream_id: int = None, params: dict = None) -> "QueryMessage":
         assert params is not None
         return QueryMessage(params["query"], self.version, self.flags(), stream_id,)
+
+    def register(self, stream_id: int = None, params: dict = None) -> "RegisterMessage":
+        assert params is not None
+        return RegisterMessage(params["events"], self.version, self.flags(), stream_id,)
 
     def prepare(self, stream_id: int = None, params: dict = None) -> "PrepareMessage":
         assert params is not None

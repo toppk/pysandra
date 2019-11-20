@@ -1,8 +1,9 @@
-from typing import List, Union
+from asyncio import Queue  # noqa
+from typing import Any, List, Optional, Union  # noqa
 
 from .constants import SchemaChangeTarget, SchemaChangeType
 
-ExpectedResponses = Union[bool, "Rows", bytes, "SchemaChange"]
+ExpectedResponses = Union[bool, "Rows", bytes, "SchemaChange", "Queue[Any]"]
 
 
 class BaseType:
@@ -32,16 +33,16 @@ class SchemaChange:
 class Rows:
     def __init__(self, column_count: int) -> None:
         self.index: int = 0
-        self._data: List[bytes] = []
+        self._data: List[Optional[bytes]] = []
         self.column_count = column_count
 
     def __iter__(self) -> "Rows":
         return self
 
-    def add(self, cell: bytes) -> None:
+    def add(self, cell: Optional[bytes]) -> None:
         self._data.append(cell)
 
-    def __next__(self) -> List[bytes]:
+    def __next__(self) -> List[Optional[bytes]]:
         if self.index == len(self._data):
             # reset
             self.index = 0

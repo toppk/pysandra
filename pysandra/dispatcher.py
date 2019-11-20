@@ -88,7 +88,7 @@ class Dispatcher:
         event = asyncio.Event()
         self._update_stream_id(stream_id, (request, response_handler, event))
         assert self._writer is not None
-        self._writer.write(request.to_bytes())
+        self._writer.write(request.encode())
         return event
 
     async def _receive(self) -> None:

@@ -4,92 +4,110 @@ import argparse
 import asyncio
 import sys
 
-from pysandra import Client, exceptions
+from pysandra import Client, Events, exceptions
+from pysandra.types import Rows, SchemaChange
 
 
-async def test_dml(client):
-    query = "SELECT release_version FROM system.local"
-    print(f"========> RUNNING {query}")
-    rows = await client.execute(query)
-    for row in rows:
-        print(f"got row={row}")
-    print(f"========> FINISHED")
-    query = "SELECT * FROM uprofile.user where user_id=1"
-    print(f"========> RUNNING {query}")
-    rows = await client.execute("SELECT * FROM uprofile.user where user_id=1")
-    for row in rows:
-        print(f">>> got row={row}")
-    print(f"========> FINISHED")
-    prepare = (
-        "INSERT INTO  uprofile.user  (user_id, user_name , user_bcity) VALUES (?,?,?)"
+class Tester:
+    def __init__(self, client):
+        self.client = client
+
+    async def connect(self):
+        return await self.client.connect()
+
+    async def close(self):
+        return await self.client.close()
+
+    async def run_register(self, events):
+        print(f"========> REGISTERING {events}")
+        resp = await self.client.register(events)
+        if isinstance(resp, asyncio.Queue):
+            print(f"========> LISTENING for events")
+            while True:
+                pass
+        # will never end
+        print(f"========> FINISHED")
+
+    async def run_query(self, query):
+        print(f"========> RUNNING {query}")
+        resp = await self.client.execute(query)
+        if isinstance(resp, Rows):
+            for row in resp:
+                print(f"got row={row}")
+        elif isinstance(resp, SchemaChange):
+            print(f">>> got schema_change={resp}")
+        elif isinstance(resp, bool):
+            print(f">>> got status={resp}")
+        else:
+            raise ValueError(f"unexpected response={resp}")
+        print(f"========> FINISHED")
+
+    async def run_prepare(self, query, data):
+        print(f"========> PREPARING {query}")
+        statement_id = await self.client.prepare(query)
+        for entry in data:
+            print(f"========> INSERTING {entry}")
+            resp = await self.client.execute(statement_id, entry)
+            if isinstance(resp, bool):
+                print(f">>> got status={resp}")
+            else:
+                raise ValueError(f"unexpected response={resp}")
+        print(f"========> FINISHED")
+
+
+async def test_dml(tester):
+    await tester.run_query("SELECT release_version FROM system.local")
+    await tester.run_query("SELECT * FROM uprofile.user where user_id=1")
+    await tester.run_prepare(
+        "INSERT INTO  uprofile.user  (user_id, user_name , user_bcity) VALUES (?,?,?)",
+        [[45, "Trump", "Washington D.C."]],
     )
-    print(f"========> PREPARING {prepare}")
-    insert = await client.prepare(prepare)
-    data = [45, "Trump", "Washington D.C."]
-    print(f"========> INSERTING {data}")
-    status = await client.execute(insert, data)
-    print(f">>> got status={status}")
-    print(f"========> FINISHED")
-    query = "SELECT * FROM uprofile.user where user_id=45"
-    print(f"========> RUNNING {query}")
-    rows = await client.execute(query)
-    for row in rows:
-        print(f">>> got row={row}")
-    print(f"========> FINISHED")
+    await tester.run_query("SELECT * FROM uprofile.user where user_id=45")
+    await tester.run_query("DELETE FROM uprofile.user where user_id=45")
+    await tester.run_query("SELECT * FROM uprofile.user where user_id=45")
 
 
-async def test_ddl(client):
-    query = "CREATE KEYSPACE IF NOT EXISTS uprofile WITH replication = {'class': 'NetworkTopologyStrategy', 'datacenter1' : '1' }"
-    print(f"========> RUNNING {query}")
-    status = await client.execute(query)
-    print(f">>> got status={status}")
-    print(f"========> FINISHED")
-    query = "CREATE TABLE IF NOT EXISTS uprofile.user (user_id int , user_name text, user_bcity text, PRIMARY KEY( user_id, user_name))"
-    print(f"========> RUNNING {query}")
-    status = await client.execute(query)
-    print(f">>> got status={status}")
-    print(f"========> FINISHED")
+async def test_ddl(tester):
+    await tester.run_query(
+        "CREATE KEYSPACE IF NOT EXISTS uprofile WITH replication = {'class': 'NetworkTopologyStrategy', 'datacenter1' : '1' }"
+    )
+    await tester.run_query(
+        "CREATE TABLE IF NOT EXISTS uprofile.user (user_id int , user_name text, user_bcity text, PRIMARY KEY( user_id, user_name))"
+    )
 
 
-async def test_dupddl(client):
-    query = "CREATE KEYSPACE IF NOT EXISTS testkeyspace WITH replication = {'class': 'NetworkTopologyStrategy', 'datacenter1' : '1' }"
-    print(f"========> RUNNING {query}")
-    status = await client.execute(query)
-    print(f">>> got status={status}")
-    print(f"========> FINISHED")
-    query = "CREATE KEYSPACE testkeyspace WITH replication = {'class': 'NetworkTopologyStrategy', 'datacenter1' : '1' }"
-    print(f"========> RUNNING {query}")
+async def test_events(tester):
+    await tester.run_register([Events.SCHEMA_CHANGE])
+
+
+async def test_dupddl(tester):
+    await tester.run_query(
+        "CREATE KEYSPACE IF NOT EXISTS testkeyspace WITH replication = {'class': 'NetworkTopologyStrategy', 'datacenter1' : '1' }"
+    )
     try:
-        status = await client.execute(query)
+        await tester.run_query(
+            "CREATE KEYSPACE testkeyspace WITH replication = {'class': 'NetworkTopologyStrategy', 'datacenter1' : '1' }"
+        )
     except exceptions.ServerError as e:
         print(f">>> got ServerError exception={e.msg.details}")
-    print(f"========> FINISHED")
-
-
-def die(exit_on_error):
-    def finish(error_code):
-        print(f"error_code={error_code} and exit_on_error={exit_on_error}")
-        if error_code is not None and error_code != 0 and exit_on_error:
-            print("will exist")
-            sys.exit(error_code)
-
-    return finish
+    await tester.run_query("DROP KEYSPACE testkeyspace")
 
 
 async def run(command, stop=False):
-    finish = die(stop)
-    client = Client()
-    await client.connect()
-    if command in ("ddl", "full"):
-        finish(await test_ddl(client))
-    if command in ("dml", "full"):
-        finish(await test_dml(client))
-    if command in ("dupddl"):
-        finish(await test_dupddl(client))
-    await client.close()
-    if command not in ("ddl", "dml", "full", "dupddl"):
+    if command not in ("ddl", "dml", "full", "dupddl", "events"):
         print(f"ERROR:unknown command={command}")
         sys.exit(1)
+    tester = Tester(Client())
+    await tester.connect()
+    if command in ("ddl", "full",):
+        await test_ddl(tester)
+    if command in ("dml", "full",):
+        await test_dml(tester)
+    if command in ("dupddl",):
+        await test_dupddl(tester)
+    if command in ("events",):
+        await test_events(tester)
+    await tester.close()
 
 
 if __name__ == "__main__":

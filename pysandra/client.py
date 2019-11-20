@@ -1,7 +1,7 @@
 import asyncio
-from typing import Tuple
+from typing import List, Tuple
 
-from .constants import REQUEST_TIMEOUT, STARTUP_TIMEOUT
+from .constants import REQUEST_TIMEOUT, STARTUP_TIMEOUT, Events  # noqa: F401
 from .dispatcher import Dispatcher
 from .exceptions import RequestTimeout, StartupTimeout
 from .protocol import Protocol
@@ -54,6 +54,22 @@ class Client:
 
     async def close(self) -> None:
         await self._dispatcher.close()
+
+    async def register(self, events: List["Events"]) -> "asyncio.Queue":
+        await self.connect()
+
+        event = await self._dispatcher.send(
+            self.protocol.register,
+            self.protocol.build_response,
+            params={"events": events},
+        )
+        try:
+            await asyncio.wait_for(event.wait(), timeout=REQUEST_TIMEOUT)
+            resp = self._dispatcher.retrieve(event)
+            assert isinstance(resp, asyncio.Queue)
+            return resp
+        except asyncio.TimeoutError as e:
+            raise RequestTimeout(e) from None
 
     async def execute(self, stmt: str, args: Tuple = None) -> "ExpectedResponses":
         await self.connect()

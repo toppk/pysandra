@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 from .constants import (
     Consitency,
     ErrorCode,
+    Events,
     Kind,
     Opcode,
     OptionID,
@@ -87,22 +88,7 @@ class STypes(str, Enum):
     LONG = "q"
     SHORT = "H"
     BYTE = "B"
-
-    @staticmethod
-    def String(text: bytes) -> str:
-        if not isinstance(text, bytes):
-            raise TypeViolation(f"text={text} should be bytes")
-        return f"{STypes.SHORT}{len(text)}s"
-
-    @staticmethod
-    def LongString(text: bytes) -> str:
-        if not isinstance(text, bytes):
-            raise TypeViolation(f"text={text} should be bytes")
-        return f"{STypes.INT}{len(text)}s"
-
-    @staticmethod
-    def Bytes(count: int) -> str:
-        return f"{count}s"
+    CHAR = "s"
 
 
 structs: dict = {}
@@ -113,6 +99,7 @@ def get_struct(fmt: str) -> Struct:
     if len(structs) == 0:
         formats = [
             f"{NETWORK_ORDER}{STypes.SHORT}",
+            f"{NETWORK_ORDER}{STypes.INT}",
             f"{NETWORK_ORDER}{STypes.BYTE}{STypes.BYTE}{STypes.SHORT}{STypes.BYTE}{STypes.INT}",
             f"{NETWORK_ORDER}{STypes.SHORT}{STypes.BYTE}",
         ]
@@ -121,6 +108,47 @@ def get_struct(fmt: str) -> Struct:
     if fmt not in structs:
         raise InternalDriverError(f"format={fmt} not cached")
     return structs[fmt]
+
+
+# encoders
+
+
+def encode_short(value: int) -> bytes:
+    return get_struct(f"{NETWORK_ORDER}{STypes.SHORT}").pack(value)
+
+
+def encode_int(value: int) -> bytes:
+    return get_struct(f"{NETWORK_ORDER}{STypes.INT}").pack(value)
+
+
+def encode_string(value: Union[str, bytes]) -> bytes:
+    if isinstance(value, bytes):
+        value_bytes = value
+    else:
+        value_bytes = value.encode("utf-8")
+    return encode_short(len(value_bytes)) + pack(
+        f"{NETWORK_ORDER}{len(value_bytes)}{STypes.CHAR}", value_bytes
+    )
+
+
+def encode_long_string(value: Union[str, bytes]) -> bytes:
+    if isinstance(value, bytes):
+        value_bytes = value
+    else:
+        value_bytes = value.encode("utf-8")
+    return encode_int(len(value_bytes)) + pack(
+        f"{NETWORK_ORDER}{len(value_bytes)}{STypes.CHAR}", value_bytes
+    )
+
+
+def encode_strings_list(values: List[str]) -> bytes:
+    data = encode_short(len(values))
+    for value in values:
+        data += encode_string(value)
+    return data
+
+
+# decoders
 
 
 def decode_short(sbytes: "SBytes") -> int:
@@ -135,14 +163,20 @@ def decode_short_bytes(sbytes: "SBytes") -> bytes:
     length = decode_short(sbytes)
     if length == 0:
         return b""
-    return unpack(f"{NETWORK_ORDER}{STypes.Bytes(length)}", sbytes.show(length))[0]
+    return unpack(f"{NETWORK_ORDER}{length}{STypes.CHAR}", sbytes.show(length))[0]
+
+
+def decode_int_bytes(sbytes: "SBytes") -> Optional[bytes]:
+    length = decode_int(sbytes)
+    if length == 0:
+        return b""
+    elif length < 0:
+        return None
+    return unpack(f"{NETWORK_ORDER}{length}{STypes.CHAR}", sbytes.show(length))[0]
 
 
 def decode_string(sbytes: "SBytes") -> str:
-    length = decode_short(sbytes)
-    return unpack(f"{NETWORK_ORDER}{STypes.Bytes(length)}", sbytes.show(length))[
-        0
-    ].decode("utf-8")
+    return decode_short_bytes(sbytes).decode("utf-8")
 
 
 def decode_strings_list(sbytes: "SBytes") -> List[str]:
@@ -181,6 +215,9 @@ class Protocol:
     def prepare(self, stream_id: int = None, params: dict = None) -> "PrepareMessage":
         pass
 
+    def register(self, stream_id: int = None, params: dict = None) -> "RegisterMessage":
+        pass
+
 
 class BaseMessage:
     pass
@@ -194,7 +231,7 @@ class RequestMessage(BaseMessage):
         self.flags = flags
         self.stream_id = stream_id
 
-    def to_bytes(self) -> bytes:
+    def encode(self) -> bytes:
         body: bytes = self.encode_body()
         header: bytes = self.encode_header(len(body))
         logger.debug(f"opcode={self.opcode} header={header!r} body={body!r}")
@@ -315,15 +352,7 @@ class ResultMessage(ResponseMessage):
             rows = Rows(column_count=column_count)
             rows_count = decode_int(body)
             for _cnt in range(rows_count * column_count):
-                length = decode_int(body)
-                cell: bytes = b""
-                if length > 0:
-                    cell = unpack(
-                        f"{NETWORK_ORDER}{STypes.Bytes(length)}", body.show(length)
-                    )[0]
-                elif length == 0:
-                    cell = b""
-                rows.add(cell)
+                rows.add(decode_int_bytes(body))
             msg = RowsResultMessage(rows, kind, version, flags, stream_id)
 
         elif kind == Kind.SET_KEYSPACE:
@@ -473,15 +502,7 @@ class StartupMessage(RequestMessage):
     def encode_body(self) -> bytes:
         body = get_struct(f"{NETWORK_ORDER}{STypes.SHORT}").pack(len(self.options))
         for key, value in self.options.items():
-            key_bytes = key.encode("utf-8")
-            value_bytes = value.encode("utf-8")
-            body += pack(
-                f"{NETWORK_ORDER}{STypes.String(key_bytes)}{STypes.String(value_bytes)}",
-                len(key_bytes),
-                key_bytes,
-                len(value_bytes),
-                value_bytes,
-            )
+            body += encode_string(key) + encode_string(value)
         return body
 
 
@@ -503,11 +524,7 @@ class ExecuteMessage(RequestMessage):
                 f" count of execute params={len(self.query_params)} doesn't match prepared statement count={len(self.col_specs)}"
             )
         # <id>
-        body = pack(
-            f"{NETWORK_ORDER}{STypes.String(self.query_id)}",
-            len(self.query_id),
-            self.query_id,
-        )
+        body = encode_string(self.query_id)
         #   <query_parameters>
         #     <consistency><flags>
         body += get_struct(f"{NETWORK_ORDER}{STypes.SHORT}{STypes.BYTE}").pack(
@@ -520,12 +537,7 @@ class ExecuteMessage(RequestMessage):
             if spec["option_id"] == OptionID.INT:
                 body += pack(f"{NETWORK_ORDER}{STypes.INT}{STypes.INT}", 4, value)
             elif spec["option_id"] == OptionID.VARCHAR:
-                value_bytes = value.encode("utf-8")
-                body += pack(
-                    f"{NETWORK_ORDER}{STypes.LongString(value_bytes)}",
-                    len(value_bytes),
-                    value_bytes,
-                )
+                body += encode_long_string(value)
             else:
                 raise InternalDriverError(
                     f"cannot handle unknown option_id={spec['option_id']}"
@@ -541,18 +553,32 @@ class QueryMessage(RequestMessage):
         super().__init__(*args)
 
     def encode_body(self) -> bytes:
-        query_bytes = self.query.encode("utf-8")
-        body = pack(
-            f"{NETWORK_ORDER}{STypes.LongString(query_bytes)}",
-            len(query_bytes),
-            query_bytes,
-        )
+        body = encode_long_string(self.query)
         #   <consistency><flags>[<n>[name_1]<value_1>...[name_n]<value_n>][<result_page_size>][<paging_state>][<serial_consistency>][<timestamp>][<keyspace>][<now_in_seconds>]
         body += get_struct(f"{NETWORK_ORDER}{STypes.SHORT}{STypes.BYTE}").pack(
             Consitency.ONE, QueryFlags.SKIP_METADATA
         )
         # query_body += pack("!HL", Consitency.ONE, 0x0002)
         return body
+
+
+class RegisterMessage(RequestMessage):
+    opcode = Opcode.REGISTER
+
+    def __init__(self, events: List[Events], *args: Any) -> None:
+        self.events = events
+        super().__init__(*args)
+
+    def encode_body(self) -> bytes:
+        checked: List[str] = []
+        for event in self.events:
+            try:
+                checked.append(Events(event))
+            except ValueError:
+                raise TypeViolation(
+                    f"got unknown event={event}. please use pysandra.Events"
+                )
+        return encode_strings_list(checked)
 
 
 class PrepareMessage(RequestMessage):
@@ -563,9 +589,4 @@ class PrepareMessage(RequestMessage):
         super().__init__(*args)
 
     def encode_body(self) -> bytes:
-        query_bytes = self.query.encode("utf-8")
-        return pack(
-            f"{NETWORK_ORDER}{STypes.LongString(query_bytes)}",
-            len(query_bytes),
-            query_bytes,
-        )
+        return encode_long_string(self.query)
