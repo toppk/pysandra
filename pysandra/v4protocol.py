@@ -52,30 +52,15 @@ class V4Protocol(Protocol):
         return flags
 
     def startup(self, stream_id: int = None, params: dict = None) -> "StartupMessage":
-        return StartupMessage(
-            version=self.version,
-            flags=self.flags(),
-            options=self.options,
-            stream_id=stream_id,
-        )
+        return StartupMessage(self.options, self.version, self.flags(), stream_id)
 
     def query(self, stream_id: int = None, params: dict = None) -> "QueryMessage":
         assert params is not None
-        return QueryMessage(
-            version=self.version,
-            flags=self.flags(),
-            query=params["query"],
-            stream_id=stream_id,
-        )
+        return QueryMessage(params["query"], self.version, self.flags(), stream_id,)
 
     def prepare(self, stream_id: int = None, params: dict = None) -> "PrepareMessage":
         assert params is not None
-        return PrepareMessage(
-            version=self.version,
-            flags=self.flags(),
-            query=params["query"],
-            stream_id=stream_id,
-        )
+        return PrepareMessage(params["query"], self.version, self.flags(), stream_id,)
 
     def execute(self, stream_id: int = None, params: dict = None) -> "ExecuteMessage":
         assert params is not None
@@ -87,12 +72,12 @@ class V4Protocol(Protocol):
         prepared = self._prepared[query_id]
         logger.debug(f"have prepared col_specs={prepared.col_specs}")
         return ExecuteMessage(
-            version=self.version,
-            flags=self.flags(),
-            query_id=query_id,
-            query_params=params["query_params"],
-            col_specs=prepared.col_specs,
-            stream_id=stream_id,
+            query_id,
+            params["query_params"],
+            prepared.col_specs,
+            self.version,
+            self.flags(),
+            stream_id,
         )
 
     def build_response(
