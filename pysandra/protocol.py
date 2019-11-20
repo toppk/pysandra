@@ -131,6 +131,13 @@ def decode_int(sbytes: "SBytes") -> int:
     return unpack(f"{NETWORK_ORDER}{STypes.INT}", sbytes.show(4))[0]
 
 
+def decode_short_bytes(sbytes: "SBytes") -> bytes:
+    length = decode_short(sbytes)
+    if length == 0:
+        return b""
+    return unpack(f"{NETWORK_ORDER}{STypes.Bytes(length)}", sbytes.show(length))[0]
+
+
 def decode_string(sbytes: "SBytes") -> str:
     length = decode_short(sbytes)
     return unpack(f"{NETWORK_ORDER}{STypes.Bytes(length)}", sbytes.show(length))[
@@ -231,24 +238,47 @@ class ReadyMessage(ResponseMessage):
 class ErrorMessage(ResponseMessage):
     opcode = Opcode.ERROR
 
-    def __init__(self, error_code: "ErrorCode", error_text: str, *args: Any) -> None:
+    def __init__(
+        self, error_code: "ErrorCode", error_text: str, details: dict, *args: Any
+    ) -> None:
         super().__init__(*args)
         self.error_code = error_code
         self.error_text = error_text
+        self.details = details
 
     @staticmethod
     def build(
         version: int, flags: int, stream_id: int, body: "SBytes"
     ) -> "ErrorMessage":
         logger.debug(f"ErrorResponse body={body!r}")
+        details: dict = {}
         code = decode_int(body)
         try:
             error_code = ErrorCode(code)
         except ValueError:
             raise InternalDriverError(f"unknown error code={code}")
-        logger.debug(f"ErrorMessage error_code={error_code:x}")
         error_text = decode_string(body)
-        return ErrorMessage(error_code, error_text, version, flags, stream_id)
+        if error_code == ErrorCode.UNAVAILABLE_EXCEPTION:
+            pass
+        elif error_code == ErrorCode.WRITE_TIMEOUT:
+            pass
+        elif error_code == ErrorCode.READ_TIMEOUT:
+            pass
+        elif error_code == ErrorCode.READ_FAILURE:
+            pass
+        elif error_code == ErrorCode.FUNCTION_FAILURE:
+            details["keyspace"] = decode_string(body)
+            details["function"] = decode_string(body)
+            details["arg_types"] = decode_strings_list(body)
+        elif error_code == ErrorCode.WRITE_FAILURE:
+            pass
+        elif error_code == ErrorCode.ALREADY_EXISTS:
+            details["keyspace"] = decode_string(body)
+            details["table"] = decode_string(body)
+        elif error_code == ErrorCode.UNPREPARED:
+            details["statement_id"] = decode_short_bytes(body)
+        logger.debug(f"ErrorMessage error_code={error_code:x}")
+        return ErrorMessage(error_code, error_text, details, version, flags, stream_id)
 
 
 class ResultMessage(ResponseMessage):
@@ -300,14 +330,9 @@ class ResultMessage(ResponseMessage):
             pass
         elif kind == Kind.PREPARED:
             # <id>
-            length = decode_short(body)
-            if length < 1:
-                raise InternalDriverError(
-                    f"cannot store prepared query id with length={length}"
-                )
-            query_id = unpack(
-                f"{NETWORK_ORDER}{STypes.Bytes(length)}", body.show(length)
-            )[0]
+            statement_id = decode_short_bytes(body)
+            if statement_id == b"":
+                raise InternalDriverError("cannot use empty prepared statement_id")
             # <metadata>
             # <flags>
             flags = decode_int(body)
@@ -324,7 +349,7 @@ class ResultMessage(ResponseMessage):
                     )
                 )
             logger.debug(
-                f"build query_id={query_id} flags={flags} columns_count={columns_count} pk_count={pk_count} pk_index={pk_index}"
+                f"build statement_id={statement_id!r} flags={flags} columns_count={columns_count} pk_count={pk_count} pk_index={pk_index}"
             )
             # <global_table_spec>
             if flags & ResultFlags.GLOBAL_TABLES_SPEC != 0:
@@ -366,7 +391,7 @@ class ResultMessage(ResponseMessage):
                 for _col in range(result_columns_count):
                     pass
             msg = PreparedResultMessage(
-                query_id, col_specs, kind, version, flags, stream_id
+                statement_id, col_specs, kind, version, flags, stream_id
             )
         elif kind == Kind.SCHEMA_CHANGE:
             # <change_type>
@@ -432,10 +457,10 @@ class SchemaResultMessage(ResultMessage):
 class PreparedResultMessage(ResultMessage):
     query_id: bytes
 
-    def __init__(self, query_id: bytes, col_specs: List[dict], *args: Any) -> None:
+    def __init__(self, statement_id: bytes, col_specs: List[dict], *args: Any) -> None:
         super().__init__(*args)
         self.col_specs = col_specs
-        self.query_id = query_id
+        self.statement_id = statement_id
 
 
 class StartupMessage(RequestMessage):

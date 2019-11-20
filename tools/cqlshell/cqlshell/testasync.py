@@ -4,7 +4,7 @@ import argparse
 import asyncio
 import sys
 
-from pysandra import Client
+from pysandra import Client, exceptions
 
 
 async def test_dml(client):
@@ -59,8 +59,10 @@ async def test_dupddl(client):
     print(f"========> FINISHED")
     query = "CREATE KEYSPACE testkeyspace WITH replication = {'class': 'NetworkTopologyStrategy', 'datacenter1' : '1' }"
     print(f"========> RUNNING {query}")
-    status = await client.execute(query)
-    print(f">>> got status={status}")
+    try:
+        status = await client.execute(query)
+    except exceptions.ServerError as e:
+        print(f">>> got ServerError exception={e.msg.details}")
     print(f"========> FINISHED")
 
 

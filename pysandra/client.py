@@ -74,7 +74,7 @@ class Client:
             event = await self._dispatcher.send(
                 self.protocol.execute,
                 self.protocol.build_response,
-                params={"query_id": stmt, "query_params": args},
+                params={"statement_id": stmt, "query_params": args},
             )
             try:
                 await asyncio.wait_for(event.wait(), timeout=REQUEST_TIMEOUT)

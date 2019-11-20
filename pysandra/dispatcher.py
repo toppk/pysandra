@@ -1,10 +1,10 @@
 import asyncio
 import sys
 import traceback
-from typing import Callable, Dict, Optional, Tuple
+from typing import Callable, Dict, Optional, Tuple, Union
 
-from .exceptions import InternalDriverError, MaximumStreamsException
-from .protocol import Protocol, RequestMessage  # noqa: F401
+from .exceptions import InternalDriverError, MaximumStreamsException, ServerError
+from .protocol import ErrorMessage, Protocol, RequestMessage  # noqa: F401
 from .types import ExpectedResponses  # noqa: F401
 from .utils import get_logger
 
@@ -19,7 +19,10 @@ class Dispatcher:
         self._port = port
         assert protocol is not None
         self._proto = protocol
-        self._data: Dict["asyncio.Event", "ExpectedResponses"] = {}
+        self._data: Dict[
+            "asyncio.Event",
+            Union["ExpectedResponses", "InternalDriverError", "ServerError"],
+        ] = {}
         self._streams: Dict[
             int, Optional[Tuple["RequestMessage", Callable, asyncio.Event]]
         ] = {}
@@ -95,13 +98,26 @@ class Dispatcher:
         version, flags, stream, opcode, length = self._proto.decode_header(head)
         body = await self._reader.read(length)
         request, response_handler, event = self._rm_stream_id(stream)
-        data = response_handler(request, version, flags, stream, opcode, length, body)
-        self._data[event] = data
+        # exceptions are stashed here (in the wrong task)
+        try:
+            self._data[event] = response_handler(
+                request, version, flags, stream, opcode, length, body
+            )
+        except ServerError as e:
+            self._data[event] = e
+        except InternalDriverError as e:
+            self._data[event] = e
         event.set()
 
     def retrieve(self, event: "asyncio.Event") -> "ExpectedResponses":
         try:
-            return self._data.pop(event)
+            response = self._data.pop(event)
+            # exceptions are raised here (in the correct task)
+            if isinstance(response, ServerError) or isinstance(
+                response, InternalDriverError
+            ):
+                raise response
+            return response
         except KeyError:
             raise InternalDriverError(f"missing data for event={event}")
 

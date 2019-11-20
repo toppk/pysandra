@@ -3,7 +3,7 @@ import typing
 
 class DriverError(Exception):
     def __init__(self, *args: typing.Any, **kwargs: typing.Any) -> None:
-        self._kw_args = kwargs
+        self.__dict__.update(kwargs)
         self._args = args
 
 

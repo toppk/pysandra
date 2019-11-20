@@ -1,9 +1,9 @@
 from typing import Callable, Dict, Optional, Tuple
 
 from .constants import CQL_VERSION, SERVER_SENT, Opcode, Options
+from .exceptions import ServerError  # noqa: F401
 from .exceptions import (
     InternalDriverError,
-    ServerError,
     UnknownPayloadException,
     VersionMismatchException,
 )
@@ -64,15 +64,15 @@ class V4Protocol(Protocol):
 
     def execute(self, stream_id: int = None, params: dict = None) -> "ExecuteMessage":
         assert params is not None
-        query_id = params["query_id"]
-        if query_id not in self._prepared:
+        statement_id = params["statement_id"]
+        if statement_id not in self._prepared:
             raise InternalDriverError(
-                f"missing query_id={query_id} in prepared statements"
+                f"missing statement_id={statement_id} in prepared statements"
             )
-        prepared = self._prepared[query_id]
+        prepared = self._prepared[statement_id]
         logger.debug(f"have prepared col_specs={prepared.col_specs}")
         return ExecuteMessage(
-            query_id,
+            statement_id,
             params["query_params"],
             prepared.col_specs,
             self.version,
@@ -118,13 +118,13 @@ class V4Protocol(Protocol):
             )
         if not sbytes_body.at_end():
             raise InternalDriverError(f"still data left remains={sbytes_body.show()!r}")
+        # error can happen any time
         if opcode == Opcode.ERROR:
             assert isinstance(response, ErrorMessage)
             raise ServerError(
                 f'got error_code={response.error_code:x} with description="{response.error_text}"',
                 msg=response,
             )
-
         return self.respond(request, response)
 
     def respond(
@@ -144,8 +144,8 @@ class V4Protocol(Protocol):
         elif request.opcode == Opcode.PREPARE:
             if response.opcode == Opcode.RESULT:
                 if isinstance(response, PreparedResultMessage):
-                    self._prepared[response.query_id] = response
-                    return response.query_id
+                    self._prepared[response.statement_id] = response
+                    return response.statement_id
         elif request.opcode == Opcode.EXECUTE:
             if response.opcode == Opcode.RESULT:
                 if isinstance(response, VoidResultMessage):
