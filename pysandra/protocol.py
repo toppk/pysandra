@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 from .constants import (
     Consitency,
+    ErrorCode,
     Kind,
     Opcode,
     OptionID,
@@ -204,37 +205,50 @@ class RequestMessage(BaseMessage):
 class ResponseMessage(BaseMessage):
     opcode: int
 
-    def __init__(
-        self, version: int = None, flags: int = None, stream_id: int = None
-    ) -> None:
+    def __init__(self, version: int, flags: int, stream_id: int) -> None:
         self.version = version
         self.flags = flags
+        self.stream_id = stream_id
+
+    @staticmethod
+    def build(
+        version: int, flags: int, stream_id: int, body: "SBytes"
+    ) -> "ResponseMessage":
+        raise InternalDriverError("subclass should implement build() method")
 
 
 class ReadyMessage(ResponseMessage):
     opcode = Opcode.READY
 
     @staticmethod
-    def build(version: int, flags: int, body: "SBytes") -> "ReadyMessage":
+    def build(
+        version: int, flags: int, stream_id: int, body: "SBytes"
+    ) -> "ReadyMessage":
         logger.debug(f"ReadyResponse body={body!r}")
-        return ReadyMessage(flags=flags)
+        return ReadyMessage(version, flags, stream_id)
 
 
 class ErrorMessage(ResponseMessage):
     opcode = Opcode.ERROR
 
-    def __init__(self, error_code: int, error_text: str, **kwargs: Any) -> None:
-        super().__init__(**kwargs)
+    def __init__(self, error_code: "ErrorCode", error_text: str, *args: Any) -> None:
+        super().__init__(*args)
         self.error_code = error_code
         self.error_text = error_text
 
     @staticmethod
-    def build(version: int, flags: int, body: "SBytes") -> "ErrorMessage":
+    def build(
+        version: int, flags: int, stream_id: int, body: "SBytes"
+    ) -> "ErrorMessage":
         logger.debug(f"ErrorResponse body={body!r}")
-        error_code = decode_int(body)
+        code = decode_int(body)
+        try:
+            error_code = ErrorCode(code)
+        except ValueError:
+            raise InternalDriverError(f"unknown error code={code}")
         logger.debug(f"ErrorMessage error_code={error_code:x}")
         error_text = decode_string(body)
-        return ErrorMessage(flags=flags, error_code=error_code, error_text=error_text)
+        return ErrorMessage(error_code, error_text, version, flags, stream_id)
 
 
 class ResultMessage(ResponseMessage):
@@ -245,12 +259,14 @@ class ResultMessage(ResponseMessage):
         self.kind = kind
 
     @staticmethod
-    def build(version: int, flags: int, body: "SBytes",) -> "ResultMessage":
+    def build(
+        version: int, flags: int, stream_id: int, body: "SBytes",
+    ) -> "ResultMessage":
         msg: Optional["ResultMessage"] = None
         kind = decode_int(body)
         logger.debug(f"ResultResponse kind={kind} body={body!r}")
         if kind == Kind.VOID:
-            msg = VoidResultMessage(version, flags, kind)
+            msg = VoidResultMessage(kind, version, flags, stream_id)
         elif kind == Kind.ROWS:
             result_flags = decode_int(body)
             column_count = decode_int(body)
@@ -278,7 +294,7 @@ class ResultMessage(ResponseMessage):
                 elif length == 0:
                     cell = b""
                 rows.add(cell)
-            msg = RowsResultMessage(rows, version, flags, kind)
+            msg = RowsResultMessage(rows, kind, version, flags, stream_id)
 
         elif kind == Kind.SET_KEYSPACE:
             pass
@@ -349,7 +365,9 @@ class ResultMessage(ResponseMessage):
                 # parse col_spec_i
                 for _col in range(result_columns_count):
                     pass
-            msg = PreparedResultMessage(query_id, col_specs, kind, version, flags)
+            msg = PreparedResultMessage(
+                query_id, col_specs, kind, version, flags, stream_id
+            )
         elif kind == Kind.SCHEMA_CHANGE:
             # <change_type>
             try:
@@ -385,7 +403,7 @@ class ResultMessage(ResponseMessage):
                 f"SCHEMA_CHANGE change_type={change_type} target={target} options={options}"
             )
             schema_change = SchemaChange(change_type, target, options)
-            msg = SchemaResultMessage(schema_change, kind, version, flags)
+            msg = SchemaResultMessage(schema_change, kind, version, flags, stream_id)
         else:
             raise UnknownPayloadException(f"RESULT message has unknown kind={kind}")
         if msg is None:

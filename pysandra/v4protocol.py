@@ -1,4 +1,4 @@
-from typing import Dict, Optional, Tuple
+from typing import Callable, Dict, Optional, Tuple
 
 from .constants import CQL_VERSION, SERVER_SENT, Opcode, Options
 from .exceptions import (
@@ -85,46 +85,46 @@ class V4Protocol(Protocol):
         request: "RequestMessage",
         version: int,
         flags: int,
-        stream: int,
+        stream_id: int,
         opcode: int,
         length: int,
         body: bytes,
     ) -> "ExpectedResponses":
         sbytes_body = SBytes(body)
         response: Optional["ResponseMessage"] = None
+        factory: Optional[Callable] = None
         if opcode == Opcode.ERROR:
-            response = ErrorMessage.build(version, flags, sbytes_body)
-            if not sbytes_body.at_end():
-                raise InternalDriverError(
-                    f"ErrorMessage still data left remains={sbytes_body.show()!r}"
-                )
-            raise ServerError(
-                f'got error_code={response.error_code:x} with description="{response.error_text}"',
-                msg=response,
-            )
+            factory = ErrorMessage.build
         elif opcode == Opcode.READY:
-            response = ReadyMessage.build(version, flags, sbytes_body)
+            factory = ReadyMessage.build
         elif opcode == Opcode.AUTHENTICATE:
             pass
         elif opcode == Opcode.SUPPORTED:
             pass
         elif opcode == Opcode.RESULT:
-            response = ResultMessage.build(version, flags, sbytes_body)
+            factory = ResultMessage.build
         elif opcode == Opcode.EVENT:
             pass
         elif opcode == Opcode.AUTH_CHALLENGE:
             pass
         elif opcode == Opcode.AUTH_SUCCESS:
             pass
-        else:
-            raise UnknownPayloadException(f"unknown message opcode={opcode}")
+        if factory is None:
+            raise UnknownPayloadException(f"unhandled message opcode={opcode}")
+        response = factory(version, flags, stream_id, sbytes_body)
         if response is None:
             raise InternalDriverError(
                 f"didn't generate a response message for opcode={opcode}"
             )
-
         if not sbytes_body.at_end():
             raise InternalDriverError(f"still data left remains={sbytes_body.show()!r}")
+        if opcode == Opcode.ERROR:
+            assert isinstance(response, ErrorMessage)
+            raise ServerError(
+                f'got error_code={response.error_code:x} with description="{response.error_text}"',
+                msg=response,
+            )
+
         return self.respond(request, response)
 
     def respond(
