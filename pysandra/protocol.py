@@ -210,71 +210,45 @@ class ReadyMessage(ResponseMessage):
     opcode = Opcode.READY
 
     @staticmethod
-    def build(
-        version: int = None, flags: int = None, body: bytes = None
-    ) -> "ReadyMessage":
-        assert body is not None
-        sbody = SBytes(body)
-        logger.debug(f"ReadyResponse body={sbody!r}")
-        if not sbody.at_end():
-            raise UnknownPayloadException(
-                f"READY message should have no payload={sbody.show()!r}"
-            )
+    def build(version: int, flags: int, body: "SBytes") -> "ReadyMessage":
+        logger.debug(f"ReadyResponse body={body!r}")
         return ReadyMessage(flags=flags)
 
 
 class ErrorMessage(ResponseMessage):
     opcode = Opcode.ERROR
 
-    def __init__(
-        self, error_code: int = None, error_text: str = None, **kwargs: Any
-    ) -> None:
+    def __init__(self, error_code: int, error_text: str, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.error_code = error_code
         self.error_text = error_text
 
     @staticmethod
-    def build(
-        version: int = None, flags: int = None, body: bytes = None
-    ) -> "ErrorMessage":
-        assert body is not None
-        sbody = SBytes(body)
-        logger.debug(f"ErrorResponse body={sbody!r}")
-        error_code = get_int(sbody)
+    def build(version: int, flags: int, body: "SBytes") -> "ErrorMessage":
+        logger.debug(f"ErrorResponse body={body!r}")
+        error_code = get_int(body)
         logger.debug(f"ErrorMessage error_code={error_code:x}")
-        error_text = get_string(sbody)
-        msg = ErrorMessage(flags=flags, error_code=error_code, error_text=error_text)
-        if not sbody.at_end():
-            raise InternalDriverError(
-                f"ErrorMessage still data left remains={sbody.show()!r}"
-            )
-        return msg
+        error_text = get_string(body)
+        return ErrorMessage(flags=flags, error_code=error_code, error_text=error_text)
 
 
 class ResultMessage(ResponseMessage):
     opcode = Opcode.RESULT
 
-    def __init__(self, kind: int = None, **kwargs: Any) -> None:
-        super().__init__(**kwargs)
+    def __init__(self, kind: int, *args: Any) -> None:
+        super().__init__(*args)
         self.kind = kind
 
     @staticmethod
-    def build(
-        version: int = None,
-        flags: int = None,
-        query_flags: int = None,
-        body: bytes = None,
-    ) -> "ResultMessage":
-        assert body is not None
-        sbody = SBytes(body)
+    def build(version: int, flags: int, body: "SBytes",) -> "ResultMessage":
         msg: Optional["ResultMessage"] = None
-        kind = get_int(sbody)
-        logger.debug(f"ResultResponse kind={kind} sbody={sbody!r}")
+        kind = get_int(body)
+        logger.debug(f"ResultResponse kind={kind} body={body!r}")
         if kind == Kind.VOID:
-            msg = VoidResultMessage(version=version, flags=flags, kind=kind)
+            msg = VoidResultMessage(version, flags, kind)
         elif kind == Kind.ROWS:
-            result_flags = get_int(sbody)
-            column_count = get_int(sbody)
+            result_flags = get_int(body)
+            column_count = get_int(body)
             logger.debug(
                 f"ResultResponse result_flags={result_flags} column_count={column_count}"
             )
@@ -288,46 +262,44 @@ class ResultMessage(ResponseMessage):
                 # parse col_spec_i
             # parse rows
             rows = Rows(column_count=column_count)
-            rows_count = get_int(sbody)
+            rows_count = get_int(body)
             for _cnt in range(rows_count * column_count):
-                if sbody.at_end():
-                    raise InternalDriverError(f"sbody at end")
-                length = get_int(sbody)
+                length = get_int(body)
                 cell: bytes = b""
                 if length > 0:
                     cell = unpack(
-                        f"{NETWORK_ORDER}{STypes.Bytes(length)}", sbody.show(length)
+                        f"{NETWORK_ORDER}{STypes.Bytes(length)}", body.show(length)
                     )[0]
                 elif length == 0:
                     cell = b""
                 rows.add(cell)
-            msg = RowsResultMessage(version=version, flags=flags, kind=kind, rows=rows)
+            msg = RowsResultMessage(rows, version, flags, kind)
 
         elif kind == Kind.SET_KEYSPACE:
             pass
         elif kind == Kind.PREPARED:
             # <id>
-            length = get_short(sbody)
+            length = get_short(body)
             if length < 1:
                 raise InternalDriverError(
                     f"cannot store prepared query id with length={length}"
                 )
             query_id = unpack(
-                f"{NETWORK_ORDER}{STypes.Bytes(length)}", sbody.show(length)
+                f"{NETWORK_ORDER}{STypes.Bytes(length)}", body.show(length)
             )[0]
             # <metadata>
             # <flags>
-            flags = get_int(sbody)
+            flags = get_int(body)
             # <columns_count>
-            columns_count = get_int(sbody)
+            columns_count = get_int(body)
             # <pk_count>
-            pk_count = get_int(sbody)
+            pk_count = get_int(body)
             pk_index = None
             if pk_count > 0:
                 pk_index = list(
                     unpack(
                         f"{NETWORK_ORDER}{STypes.SHORT * pk_count}",
-                        sbody.show(2 * pk_count),
+                        body.show(2 * pk_count),
                     )
                 )
             logger.debug(
@@ -337,9 +309,9 @@ class ResultMessage(ResponseMessage):
             assert flags is not None
             if flags & ResultFlags.GLOBAL_TABLES_SPEC != 0:
                 # <keyspace>
-                keyspace = get_string(sbody)
+                keyspace = get_string(body)
                 # <table>
-                table = get_string(sbody)
+                table = get_string(body)
                 logger.debug(f"build keyspace={keyspace} table={table}")
             # <col_spec_i>
             col_specs = []
@@ -348,21 +320,21 @@ class ResultMessage(ResponseMessage):
                     col_spec: Dict[str, Union[str, int]] = {}
                     if flags & ResultFlags.GLOBAL_TABLES_SPEC == 0:
                         # <ksname><tablename>
-                        col_spec["ksname"] = get_string(sbody)
-                        col_spec["tablename"] = get_string(sbody)
+                        col_spec["ksname"] = get_string(body)
+                        col_spec["tablename"] = get_string(body)
                     # <name><type>
-                    col_spec["name"] = get_string(sbody)
+                    col_spec["name"] = get_string(body)
                     # <type>
-                    option_id = get_short(sbody)
+                    option_id = get_short(body)
                     if option_id < 0x0001 or option_id > 0x0014:
                         raise InternalDriverError(f"unhandled option_id={option_id}")
                     col_spec["option_id"] = option_id
                     col_specs.append(col_spec)
             # <result_metadata>
             # <flags>
-            result_flags = get_int(sbody)
+            result_flags = get_int(body)
             # <columns_count>
-            result_columns_count = get_int(sbody)
+            result_columns_count = get_int(body)
             if result_flags & ResultFlags.HAS_MORE_PAGES != 0x00:
                 # parse paging state
                 pass
@@ -373,17 +345,11 @@ class ResultMessage(ResponseMessage):
                 # parse col_spec_i
                 for _col in range(result_columns_count):
                     pass
-            msg = PreparedResultMessage(
-                version=version,
-                flags=flags,
-                kind=kind,
-                col_specs=col_specs,
-                query_id=query_id,
-            )
+            msg = PreparedResultMessage(query_id, col_specs, kind, version, flags)
         elif kind == Kind.SCHEMA_CHANGE:
             # <change_type>
             try:
-                string = get_string(sbody)
+                string = get_string(body)
                 change_type = SchemaChangeType(string)
             except ValueError:
                 raise UnknownPayloadException(
@@ -391,51 +357,44 @@ class ResultMessage(ResponseMessage):
                 )
             # <target>
             try:
-                string = get_string(sbody)
+                string = get_string(body)
                 target = SchemaChangeTarget(string)
             except ValueError:
                 raise UnknownPayloadException(f"got unexpected target={target}")
             # <options>
             options: Dict[str, Union[str, List[str]]] = {}
             if target == SchemaChangeTarget.KEYSPACE:
-                options["target_name"] = get_string(sbody)
+                options["target_name"] = get_string(body)
             elif target in (SchemaChangeTarget.TABLE, SchemaChangeTarget.TYPE):
-                options["keyspace_name"] = get_string(sbody)
-                options["target_name"] = get_string(sbody)
+                options["keyspace_name"] = get_string(body)
+                options["target_name"] = get_string(body)
             elif target in (SchemaChangeTarget.FUNCTION, SchemaChangeTarget.AGGREGATE):
-                options["keyspace_name"] = get_string(sbody)
-                options["target_name"] = get_string(sbody)
-                options["argument_types"] = get_strings_list(sbody)
+                options["keyspace_name"] = get_string(body)
+                options["target_name"] = get_string(body)
+                options["argument_types"] = get_strings_list(body)
             else:
                 raise InternalDriverError(
-                    f"unhandled target={target} with body={sbody.show()!r}"
+                    f"unhandled target={target} with body={body.show()!r}"
                 )
 
             print(
                 f"SCHEMA_CHANGE change_type={change_type} target={target} options={options}"
             )
             schema_change = SchemaChange(change_type, target, options)
-            msg = SchemaResultMessage(
-                version=version, flags=flags, kind=kind, schema_change=schema_change,
-            )
+            msg = SchemaResultMessage(schema_change, kind, version, flags)
         else:
             raise UnknownPayloadException(f"RESULT message has unknown kind={kind}")
         if msg is None:
             raise InternalDriverError(
-                f"ResultResponse no msg generated for sbody={sbody!r}"
-            )
-        if not sbody.at_end():
-            raise InternalDriverError(
-                f"ResultResponse still data left remains={sbody.show()!r}"
+                f"ResultResponse no msg generated for body={body!r}"
             )
         return msg
 
 
 class RowsResultMessage(ResultMessage):
-    def __init__(self, rows: "Rows" = None, **kwargs: Any) -> None:
-        assert rows is not None
+    def __init__(self, rows: "Rows", *args: Any) -> None:
         self.rows: "Rows" = rows
-        super().__init__(**kwargs)
+        super().__init__(*args)
 
 
 class VoidResultMessage(ResultMessage):
@@ -443,21 +402,17 @@ class VoidResultMessage(ResultMessage):
 
 
 class SchemaResultMessage(ResultMessage):
-    def __init__(self, schema_change: "SchemaChange" = None, **kwargs: Any) -> None:
-        assert schema_change is not None
+    def __init__(self, schema_change: "SchemaChange", *args: Any) -> None:
         self.schema_change: "SchemaChange" = schema_change
-        super().__init__(**kwargs)
+        super().__init__(*args)
 
 
 class PreparedResultMessage(ResultMessage):
     query_id: bytes
 
-    def __init__(
-        self, query_id: bytes = None, col_specs: List[dict] = None, **kwargs: Any
-    ) -> None:
-        super().__init__(**kwargs)
+    def __init__(self, query_id: bytes, col_specs: List[dict], *args: Any) -> None:
+        super().__init__(*args)
         self.col_specs = col_specs
-        assert query_id is not None
         self.query_id = query_id
 
 

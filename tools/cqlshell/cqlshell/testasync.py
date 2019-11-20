@@ -57,11 +57,11 @@ async def test_dupddl(client):
     status = await client.execute(query)
     print(f">>> got status={status}")
     print(f"========> FINISHED")
-    # query=  "CREATE KEYSPACE testkeyspace WITH replication = {'class': 'NetworkTopologyStrategy', 'datacenter1' : '1' }"
-    # print(f"========> RUNNING {query}")
-    # status = await client.execute(query)
-    # print(f">>> got status={status}")
-    # print(f"========> FINISHED")
+    query = "CREATE KEYSPACE testkeyspace WITH replication = {'class': 'NetworkTopologyStrategy', 'datacenter1' : '1' }"
+    print(f"========> RUNNING {query}")
+    status = await client.execute(query)
+    print(f">>> got status={status}")
+    print(f"========> FINISHED")
 
 
 def die(exit_on_error):

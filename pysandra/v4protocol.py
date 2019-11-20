@@ -27,7 +27,7 @@ from .protocol import (
     get_struct,
 )
 from .types import ExpectedResponses  # noqa: F401
-from .utils import get_logger
+from .utils import SBytes, get_logger
 
 logger = get_logger(__name__)
 
@@ -105,23 +105,26 @@ class V4Protocol(Protocol):
         length: int,
         body: bytes,
     ) -> "ExpectedResponses":
+        sbytes_body = SBytes(body)
         response: Optional["ResponseMessage"] = None
         if opcode == Opcode.ERROR:
-            response = ErrorMessage.build(version=version, flags=flags, body=body)
+            response = ErrorMessage.build(version, flags, sbytes_body)
+            if not sbytes_body.at_end():
+                raise InternalDriverError(
+                    f"ErrorMessage still data left remains={sbytes_body.show()!r}"
+                )
             raise ServerError(
                 f'got error_code={response.error_code:x} with description="{response.error_text}"',
                 msg=response,
             )
         elif opcode == Opcode.READY:
-            response = ReadyMessage.build(version=version, flags=flags, body=body)
+            response = ReadyMessage.build(version, flags, sbytes_body)
         elif opcode == Opcode.AUTHENTICATE:
             pass
         elif opcode == Opcode.SUPPORTED:
             pass
         elif opcode == Opcode.RESULT:
-            response = ResultMessage.build(
-                version=version, flags=flags, query_flags=request.flags, body=body
-            )
+            response = ResultMessage.build(version, flags, sbytes_body)
         elif opcode == Opcode.EVENT:
             pass
         elif opcode == Opcode.AUTH_CHALLENGE:
@@ -133,6 +136,11 @@ class V4Protocol(Protocol):
         if response is None:
             raise InternalDriverError(
                 f"didn't generate a response message for opcode={opcode}"
+            )
+
+        if not sbytes_body.at_end():
+            raise InternalDriverError(
+                f"still data left remains={sbytes_body.show()!r}"
             )
         return self.respond(request, response)
 
