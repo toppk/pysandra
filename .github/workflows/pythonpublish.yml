@@ -19,8 +19,8 @@ jobs:
         pip install -U setuptools wheel twine
     - name: Build and publish
       env:
-        TWINE_USERNAME: ${{ secrets.GITHUB_PUBLISH_PYSANDRA }}
-        TWINE_PASSWORD: blank
+        TWINE_USERNAME: __token__
+        TWINE_PASSWORD: ${{ secrets.GITHUB_PUBLISH_PYSANDRA }}
       run: |
         python setup.py sdist bdist_wheel
         twine upload dist/*
