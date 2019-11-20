@@ -126,6 +126,10 @@ def get_short(sbytes: "SBytes") -> int:
     return unpack(f"{NETWORK_ORDER}{STypes.SHORT}", sbytes.show(2))[0]
 
 
+def get_int(sbytes: "SBytes") -> int:
+    return unpack(f"{NETWORK_ORDER}{STypes.INT}", sbytes.show(4))[0]
+
+
 def get_string(sbytes: "SBytes") -> str:
     length = get_short(sbytes)
     return unpack(f"{NETWORK_ORDER}{STypes.Bytes(length)}", sbytes.show(length))[
@@ -236,12 +240,9 @@ class ErrorMessage(ResponseMessage):
         assert body is not None
         sbody = SBytes(body)
         logger.debug(f"ErrorResponse body={sbody!r}")
-        error_code = unpack(f"{NETWORK_ORDER}{STypes.INT}", sbody.show(4))[0]
+        error_code = get_int(sbody)
         logger.debug(f"ErrorMessage error_code={error_code:x}")
-        length = unpack(f"{NETWORK_ORDER}{STypes.SHORT}", sbody.show(2))[0]
-        error_text = unpack(
-            f"{NETWORK_ORDER}{STypes.Bytes(length)}", sbody.show(length)
-        )[0].decode("utf-8")
+        error_text = get_string(sbody)
         msg = ErrorMessage(flags=flags, error_code=error_code, error_text=error_text)
         if not sbody.at_end():
             raise InternalDriverError(
@@ -267,13 +268,13 @@ class ResultMessage(ResponseMessage):
         assert body is not None
         sbody = SBytes(body)
         msg: Optional["ResultMessage"] = None
-        kind = unpack(f"{NETWORK_ORDER}{STypes.INT}", sbody.show(4))[0]
+        kind = get_int(sbody)
         logger.debug(f"ResultResponse kind={kind} sbody={sbody!r}")
         if kind == Kind.VOID:
             msg = VoidResultMessage(version=version, flags=flags, kind=kind)
         elif kind == Kind.ROWS:
-            result_flags = unpack(f"{NETWORK_ORDER}{STypes.INT}", sbody.show(4))[0]
-            column_count = unpack(f"{NETWORK_ORDER}{STypes.INT}", sbody.show(4))[0]
+            result_flags = get_int(sbody)
+            column_count = get_int(sbody)
             logger.debug(
                 f"ResultResponse result_flags={result_flags} column_count={column_count}"
             )
@@ -287,11 +288,11 @@ class ResultMessage(ResponseMessage):
                 # parse col_spec_i
             # parse rows
             rows = Rows(column_count=column_count)
-            rows_count = unpack(f"{NETWORK_ORDER}{STypes.INT}", sbody.show(4))[0]
+            rows_count = get_int(sbody)
             for _cnt in range(rows_count * column_count):
                 if sbody.at_end():
                     raise InternalDriverError(f"sbody at end")
-                length = unpack(f"{NETWORK_ORDER}{STypes.INT}", sbody.show(4))[0]
+                length = get_int(sbody)
                 cell: bytes = b""
                 if length > 0:
                     cell = unpack(
@@ -306,7 +307,7 @@ class ResultMessage(ResponseMessage):
             pass
         elif kind == Kind.PREPARED:
             # <id>
-            length = unpack(f"{NETWORK_ORDER}{STypes.SHORT}", sbody.show(2))[0]
+            length = get_short(sbody)
             if length < 1:
                 raise InternalDriverError(
                     f"cannot store prepared query id with length={length}"
@@ -316,11 +317,11 @@ class ResultMessage(ResponseMessage):
             )[0]
             # <metadata>
             # <flags>
-            flags = unpack(f"{NETWORK_ORDER}{STypes.INT}", sbody.show(4))[0]
+            flags = get_int(sbody)
             # <columns_count>
-            columns_count = unpack(f"{NETWORK_ORDER}{STypes.INT}", sbody.show(4))[0]
+            columns_count = get_int(sbody)
             # <pk_count>
-            pk_count = unpack(f"{NETWORK_ORDER}{STypes.INT}", sbody.show(4))[0]
+            pk_count = get_int(sbody)
             pk_index = None
             if pk_count > 0:
                 pk_index = list(
@@ -335,57 +336,33 @@ class ResultMessage(ResponseMessage):
             # <global_table_spec>
             assert flags is not None
             if flags & ResultFlags.GLOBAL_TABLES_SPEC != 0:
-                # keyspace
-                length = unpack(f"{NETWORK_ORDER}{STypes.SHORT}", sbody.show(2))[0]
-                keyspace = unpack(
-                    f"{NETWORK_ORDER}{STypes.Bytes(length)}", sbody.show(length)
-                )[0].decode("utf-8")
-                # table
-                length = unpack(f"{NETWORK_ORDER}{STypes.SHORT}", sbody.show(2))[0]
-                table = unpack(
-                    f"{NETWORK_ORDER}{STypes.Bytes(length)}", sbody.show(length)
-                )[0].decode("utf-8")
+                # <keyspace>
+                keyspace = get_string(sbody)
+                # <table>
+                table = get_string(sbody)
                 logger.debug(f"build keyspace={keyspace} table={table}")
             # <col_spec_i>
             col_specs = []
             if columns_count > 0:
                 for _col in range(columns_count):
-                    col_spec = {}
+                    col_spec: Dict[str, Union[str, int]] = {}
                     if flags & ResultFlags.GLOBAL_TABLES_SPEC == 0:
                         # <ksname><tablename>
-                        length = unpack(
-                            f"{NETWORK_ORDER}{STypes.SHORT}", sbody.show(2)
-                        )[0]
-                        col_spec["ksname"] = unpack(
-                            f"{NETWORK_ORDER}{STypes.Bytes(length)}", sbody.show(length)
-                        )[0].decode("utf-8")
-                        length = unpack(
-                            f"{NETWORK_ORDER}{STypes.SHORT}", sbody.show(2)
-                        )[0]
-                        col_spec["tablename"] = unpack(
-                            f"{NETWORK_ORDER}{STypes.Bytes(length)}", sbody.show(length)
-                        )[0].decode("utf-8")
+                        col_spec["ksname"] = get_string(sbody)
+                        col_spec["tablename"] = get_string(sbody)
                     # <name><type>
-                    length = unpack(f"{NETWORK_ORDER}{STypes.SHORT}", sbody.show(2))[0]
-                    col_spec["name"] = unpack(
-                        f"{NETWORK_ORDER}{STypes.Bytes(length)}", sbody.show(length)
-                    )[0].decode("utf-8")
+                    col_spec["name"] = get_string(sbody)
                     # <type>
-                    col_spec["option_id"] = unpack(
-                        f"{NETWORK_ORDER}{STypes.SHORT}", sbody.show(2)
-                    )[0]
-                    if col_spec["option_id"] < 0x0001 or col_spec["option_id"] > 0x0014:
-                        raise InternalDriverError(
-                            f"unhandled option_id={col_spec['option_id']}"
-                        )
+                    option_id = get_short(sbody)
+                    if option_id < 0x0001 or option_id > 0x0014:
+                        raise InternalDriverError(f"unhandled option_id={option_id}")
+                    col_spec["option_id"] = option_id
                     col_specs.append(col_spec)
             # <result_metadata>
             # <flags>
-            result_flags = unpack(f"{NETWORK_ORDER}{STypes.INT}", sbody.show(4))[0]
+            result_flags = get_int(sbody)
             # <columns_count>
-            result_columns_count = unpack(
-                f"{NETWORK_ORDER}{STypes.INT}", sbody.show(4)
-            )[0]
+            result_columns_count = get_int(sbody)
             if result_flags & ResultFlags.HAS_MORE_PAGES != 0x00:
                 # parse paging state
                 pass
