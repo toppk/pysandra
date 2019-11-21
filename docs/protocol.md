@@ -151,7 +151,7 @@ How to remove registration
 What is the license for the protocol documents?
 
 if options returns supoported method options={'PROTOCOL_VERSIONS': ['3/v3', '4/v4', '5/v5-beta'], 'COMPRESSION': ['snappy', 'lz4'], 'CQL_VERSION': ['3.4.4']}
-What is the correct CQL_VERSION (sec. 4.1.1).  If you send options first, what protocol_version should you used (sec 2.1)
+What is the correct CQL_VERSION (sec. 4.1.1).  If you send options first, what protocol_version should you used (sec 2.1)   THROW_ON_OVERLOAD  NO_COMPACT CQL_VERSION
 
 (sec 5)     # Cassandra writes the uncompressed message length in big endian order,
             # but the lz4 lib requires little endian order, so we wrap these

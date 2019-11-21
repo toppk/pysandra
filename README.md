@@ -72,6 +72,8 @@ Aims to be:
 ## Todos
 
 * get real data
+* query with args
+* paging
 * improve tester
 * make user objects user friendly (exceptions, EventChage, Rows)
 * compression for requests

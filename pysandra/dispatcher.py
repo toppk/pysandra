@@ -3,10 +3,11 @@ import sys
 import traceback
 from typing import Callable, Dict, Optional, Tuple, Union
 
+from .connection import Connection  # noqa
 from .constants import EVENT_STREAM_ID, Flags
 from .exceptions import InternalDriverError, MaximumStreamsException, ServerError
 from .protocol import ErrorMessage, Protocol, RequestMessage  # noqa: F401
-from .types import Connection, ExpectedResponses  # noqa: F401
+from .types import ExpectedResponses  # noqa: F401
 from .utils import get_logger
 
 logger = get_logger(__name__)

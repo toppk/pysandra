@@ -3,11 +3,12 @@ from os import getpid
 from signal import Signals
 from typing import List, Optional, Tuple
 
+from .connection import Connection
 from .constants import REQUEST_TIMEOUT, STARTUP_TIMEOUT, Events  # noqa: F401
 from .dispatcher import Dispatcher
 from .exceptions import RequestTimeout, StartupTimeout, TypeViolation
 from .protocol import Protocol
-from .types import Connection, ExpectedResponses  # noqa: F401
+from .types import ExpectedResponses  # noqa: F401
 from .utils import get_logger
 from .v4protocol import V4Protocol
 
@@ -110,12 +111,16 @@ class Client:
         self, stmt: str, args: Tuple = None, send_metadata: bool = False
     ) -> "ExpectedResponses":
         await self.connect()
-        if args is None:
+        if isinstance(stmt, str):
             # query
             event = await self._dispatcher.send(
                 self.protocol.query,
                 self.protocol.build_response,
-                params={"query": stmt, "send_metadata": send_metadata},
+                params={
+                    "query": stmt,
+                    "query_params": args,
+                    "send_metadata": send_metadata,
+                },
             )
             try:
                 await asyncio.wait_for(event.wait(), timeout=REQUEST_TIMEOUT)

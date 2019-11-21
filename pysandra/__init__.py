@@ -1,11 +1,19 @@
 from .__about__ import __description__, __title__, __version__
 from .client import Client
+from .connection import Connection
 from .constants import Events
 from .utils import get_logger
 
 logger = get_logger(__name__)
 
-__all__ = ["__description__", "__title__", "__version__", "Client", "Events"]
+__all__ = [
+    "__description__",
+    "__title__",
+    "__version__",
+    "Client",
+    "Events",
+    "Connection",
+]
 
 
 logger.warn(
