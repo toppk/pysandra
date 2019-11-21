@@ -88,7 +88,7 @@ class Dispatcher:
         self._update_stream_id(stream_id, (request, response_handler, event))
         assert self._writer is not None
         # should order compression
-        self._writer.write(request.encode())
+        self._writer.write(bytes(request))
         return event
 
     async def _receive(self) -> None:

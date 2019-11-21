@@ -155,18 +155,18 @@ def encode_strings_list(values: List[str]) -> bytes:
 
 
 def decode_short(sbytes: "SBytes") -> int:
-    return unpack(f"{NETWORK_ORDER}{STypes.USHORT}", sbytes.show(2))[0]
+    return unpack(f"{NETWORK_ORDER}{STypes.USHORT}", sbytes.grab(2))[0]
 
 
 def decode_int(sbytes: "SBytes") -> int:
-    return unpack(f"{NETWORK_ORDER}{STypes.INT}", sbytes.show(4))[0]
+    return unpack(f"{NETWORK_ORDER}{STypes.INT}", sbytes.grab(4))[0]
 
 
 def decode_short_bytes(sbytes: "SBytes") -> bytes:
     length = decode_short(sbytes)
     if length == 0:
         return b""
-    return unpack(f"{NETWORK_ORDER}{length}{STypes.CHAR}", sbytes.show(length))[0]
+    return unpack(f"{NETWORK_ORDER}{length}{STypes.CHAR}", sbytes.grab(length))[0]
 
 
 def decode_int_bytes(sbytes: "SBytes") -> Optional[bytes]:
@@ -175,7 +175,7 @@ def decode_int_bytes(sbytes: "SBytes") -> Optional[bytes]:
         return b""
     elif length < 0:
         return None
-    return unpack(f"{NETWORK_ORDER}{length}{STypes.CHAR}", sbytes.show(length))[0]
+    return unpack(f"{NETWORK_ORDER}{length}{STypes.CHAR}", sbytes.grab(length))[0]
 
 
 def decode_string(sbytes: "SBytes") -> str:
@@ -271,7 +271,7 @@ class RequestMessage(BaseMessage):
         self.flags = flags
         self.stream_id = stream_id
 
-    def encode(self) -> bytes:
+    def __bytes__(self) -> bytes:
         body: bytes = self.encode_body()
         header: bytes = self.encode_header(len(body))
         logger.debug(f"opcode={self.opcode} header={header!r} body={body!r}")
@@ -409,7 +409,7 @@ class EventMessage(ResponseMessage):
             options["argument_types"] = decode_strings_list(body)
         else:
             raise InternalDriverError(
-                f"unhandled target={target} with body={body.show()!r}"
+                f"unhandled target={target} with body={body.remaining!r}"
             )
 
         logger.debug(
@@ -542,7 +542,7 @@ class ResultMessage(ResponseMessage):
                 pk_index = list(
                     unpack(
                         f"{NETWORK_ORDER}{STypes.USHORT * pk_count}",
-                        body.show(2 * pk_count),
+                        body.grab(2 * pk_count),
                     )
                 )
             logger.debug(

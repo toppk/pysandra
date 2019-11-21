@@ -104,7 +104,9 @@ class V4Protocol(Protocol):
         sbytes_body = SBytes(body)
         msg = EventMessage.build(version, flags, stream_id, sbytes_body)
         if not sbytes_body.at_end():
-            raise InternalDriverError(f"still data left remains={sbytes_body.show()!r}")
+            raise InternalDriverError(
+                f"still data left remains={sbytes_body.remaining!r}"
+            )
         await self._events.put(msg.event)
 
     def build_response(
@@ -148,7 +150,9 @@ class V4Protocol(Protocol):
                 f"didn't generate a response message for opcode={opcode}"
             )
         if not sbytes_body.at_end():
-            raise InternalDriverError(f"still data left remains={sbytes_body.show()!r}")
+            raise InternalDriverError(
+                f"still data left remains={sbytes_body.remaining!r}"
+            )
         # error can happen any time
         if opcode == Opcode.ERROR:
             assert isinstance(response, ErrorMessage)

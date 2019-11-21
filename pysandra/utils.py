@@ -2,7 +2,7 @@ import logging
 import os
 import sys
 from struct import Struct
-from typing import List, Optional, Type, cast
+from typing import List, Type, cast
 
 from .exceptions import InternalDriverError
 
@@ -79,7 +79,7 @@ def get_logger(name: str) -> logging.Logger:
 
 
 class SBytes(bytes):
-    my_index: Optional[int] = 0
+    _index: int = 0
 
     def __new__(cls: Type[bytes], val: bytes) -> "SBytes":
         return cast(SBytes, super().__new__(cls, val))  # type: ignore # https://github.com/python/typeshed/issues/2630
@@ -87,30 +87,29 @@ class SBytes(bytes):
     def hex(self) -> str:
         return "0x" + super().hex()
 
-    def show(self, count: Optional[int] = None) -> bytes:
-        assert self.my_index is not None
-        if count is None:
-            curindex = self.my_index
-            self.my_index = len(self)
-            return self[curindex:]
-
-        if self.my_index + count > len(self):
+    def grab(self, count: int) -> bytes:
+        assert self._index is not None
+        if self._index + count > len(self):
             raise InternalDriverError(
-                f"cannot go beyond {len(self)} count={count} index={self.my_index} sbytes={self!r}"
+                f"cannot go beyond {len(self)} count={count} index={self._index} sbytes={self!r}"
             )
-        curindex = self.my_index
-        self.my_index += count
+        curindex = self._index
+        self._index += count
         return self[curindex : curindex + count]
 
     def at_end(self) -> bool:
-        return self.my_index == len(self)
+        return self._index == len(self)
+
+    @property
+    def remaining(self) -> bytes:
+        return self[self._index :]
 
 
 if __name__ == "__main__":
     t = SBytes(b"12345")
-    print(f"{t.show(1)!r}{t.at_end()}")
-    print(f"{t.show(3)!r}{t.at_end()}")
-    print(f"{t.show(1)!r}{t.at_end()}")
+    print(f"{t.grab(1)!r}{t.at_end()}")
+    print(f"{t.grab(3)!r}{t.at_end()}")
+    print(f"{t.grab(1)!r}{t.at_end()}")
 
     pkzip = PKZip()
     algo = "lz4"
