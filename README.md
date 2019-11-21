@@ -47,7 +47,6 @@ Things that don't exist:
 * any ssl support
 * any connection support other then localhost :)
 * sync support (version 2.0)
-* DDL support
 * full error handling
 * results into native python types
 * ...
@@ -73,7 +72,9 @@ Aims to be:
 ## Todos
 
 * get real data
-* send compression
+* improve tester
+* make user objects user friendly (exceptions, EventChage, Rows)
+* compression for requests
 * Tests
 * TLS
 * AUTH

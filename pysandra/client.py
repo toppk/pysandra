@@ -106,14 +106,16 @@ class Client:
         except asyncio.TimeoutError as e:
             raise RequestTimeout(e) from None
 
-    async def execute(self, stmt: str, args: Tuple = None) -> "ExpectedResponses":
+    async def execute(
+        self, stmt: str, args: Tuple = None, send_metadata: bool = False
+    ) -> "ExpectedResponses":
         await self.connect()
         if args is None:
             # query
             event = await self._dispatcher.send(
                 self.protocol.query,
                 self.protocol.build_response,
-                params={"query": stmt},
+                params={"query": stmt, "send_metadata": send_metadata},
             )
             try:
                 await asyncio.wait_for(event.wait(), timeout=REQUEST_TIMEOUT)
@@ -125,7 +127,11 @@ class Client:
             event = await self._dispatcher.send(
                 self.protocol.execute,
                 self.protocol.build_response,
-                params={"statement_id": stmt, "query_params": args},
+                params={
+                    "statement_id": stmt,
+                    "query_params": args,
+                    "send_metadata": send_metadata,
+                },
             )
             try:
                 await asyncio.wait_for(event.wait(), timeout=REQUEST_TIMEOUT)

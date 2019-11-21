@@ -55,15 +55,21 @@ class V4Protocol(Protocol):
 
     def query(self, stream_id: int, params: dict) -> "QueryMessage":
         assert params is not None
-        return QueryMessage(params["query"], self.version, self.flags(), stream_id,)
+        return QueryMessage(
+            params["query"],
+            params["send_metadata"],
+            self.version,
+            self.flags(),
+            stream_id,
+        )
 
     def register(self, stream_id: int, params: dict) -> "RegisterMessage":
         assert params is not None
-        return RegisterMessage(params["events"], self.version, self.flags(), stream_id,)
+        return RegisterMessage(params["events"], self.version, self.flags(), stream_id)
 
     def prepare(self, stream_id: int, params: dict) -> "PrepareMessage":
         assert params is not None
-        return PrepareMessage(params["query"], self.version, self.flags(), stream_id,)
+        return PrepareMessage(params["query"], self.version, self.flags(), stream_id)
 
     def execute(self, stream_id: int, params: dict) -> "ExecuteMessage":
         assert params is not None
@@ -77,6 +83,7 @@ class V4Protocol(Protocol):
         return ExecuteMessage(
             statement_id,
             params["query_params"],
+            params["send_metadata"],
             prepared.col_specs,
             self.version,
             self.flags(),

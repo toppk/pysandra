@@ -451,6 +451,46 @@ class ResultMessage(ResponseMessage):
         self.kind = kind
 
     @staticmethod
+    def decode_col_specs(
+        result_flags: int, columns_count: int, body: "SBytes"
+    ) -> List[dict]:
+        # <global_table_spec>
+        global_keyspace: Optional[str] = None
+        global_table: Optional[str] = None
+        if result_flags & ResultFlags.GLOBAL_TABLES_SPEC != 0:
+            # <keyspace>
+            global_keyspace = decode_string(body)
+            # <table>
+            global_table = decode_string(body)
+            logger.debug(
+                f"build keyspace={global_keyspace} table={global_table} result_flags={result_flags!r}"
+            )
+        # <col_spec_i>
+        col_specs = []
+        if columns_count > 0:
+            for _col in range(columns_count):
+                col_spec: Dict[str, Union[str, int]] = {}
+                if result_flags & ResultFlags.GLOBAL_TABLES_SPEC == 0:
+                    # <ksname><tablename>
+                    col_spec["ksname"] = decode_string(body)
+                    col_spec["tablename"] = decode_string(body)
+                else:
+                    assert global_keyspace is not None
+                    assert global_table is not None
+                    col_spec["ksname"] = global_keyspace
+                    col_spec["tablename"] = global_table
+                # <name><type>
+                col_spec["name"] = decode_string(body)
+                # <type>
+                option_id = decode_short(body)
+                if option_id < 0x0001 or option_id > 0x0014:
+                    raise InternalDriverError(f"unhandled option_id={option_id}")
+                col_spec["option_id"] = option_id
+                col_specs.append(col_spec)
+        logger.debug(f"col_specs={col_specs}")
+        return col_specs
+
+    @staticmethod
     def build(
         version: int, flags: int, stream_id: int, body: "SBytes",
     ) -> "ResultMessage":
@@ -467,18 +507,20 @@ class ResultMessage(ResponseMessage):
             )
             if result_flags & ResultFlags.HAS_MORE_PAGES != 0x00:
                 # parse paging state
-                pass
+                raise InternalDriverError(f"need to parse paging state")
+            col_specs: Optional[List[Dict[str, Any]]] = None
             if result_flags & ResultFlags.NO_METADATA == 0x00:
-                if result_flags & ResultFlags.GLOBAL_TABLES_SPEC != 0x00:
-                    # parse global_table_spec
-                    pass
-                # parse col_spec_i
+                col_specs = ResultMessage.decode_col_specs(
+                    result_flags, column_count, body
+                )
             # parse rows
             rows = Rows(column_count=column_count)
             rows_count = decode_int(body)
             for _cnt in range(rows_count * column_count):
                 rows.add(decode_int_bytes(body))
-            msg = RowsResultMessage(rows, kind, version, flags, stream_id)
+            msg = RowsResultMessage(
+                rows, kind, version, flags, stream_id, col_specs=col_specs
+            )
 
         elif kind == Kind.SET_KEYSPACE:
             keyspace = decode_string(body)
@@ -490,7 +532,7 @@ class ResultMessage(ResponseMessage):
                 raise InternalDriverError("cannot use empty prepared statement_id")
             # <metadata>
             # <flags>
-            flags = decode_int(body)
+            result_flags = decode_int(body)
             # <columns_count>
             columns_count = decode_int(body)
             # <pk_count>
@@ -504,40 +546,19 @@ class ResultMessage(ResponseMessage):
                     )
                 )
             logger.debug(
-                f"build statement_id={statement_id!r} flags={flags} columns_count={columns_count} pk_count={pk_count} pk_index={pk_index}"
+                f"build statement_id={statement_id!r} result_flags={result_flags} "
+                + f"columns_count={columns_count} pk_count={pk_count} pk_index={pk_index}"
             )
-            # <global_table_spec>
-            if flags & ResultFlags.GLOBAL_TABLES_SPEC != 0:
-                # <keyspace>
-                keyspace = decode_string(body)
-                # <table>
-                table = decode_string(body)
-                logger.debug(f"build keyspace={keyspace} table={table}")
-            # <col_spec_i>
-            col_specs = []
-            if columns_count > 0:
-                for _col in range(columns_count):
-                    col_spec: Dict[str, Union[str, int]] = {}
-                    if flags & ResultFlags.GLOBAL_TABLES_SPEC == 0:
-                        # <ksname><tablename>
-                        col_spec["ksname"] = decode_string(body)
-                        col_spec["tablename"] = decode_string(body)
-                    # <name><type>
-                    col_spec["name"] = decode_string(body)
-                    # <type>
-                    option_id = decode_short(body)
-                    if option_id < 0x0001 or option_id > 0x0014:
-                        raise InternalDriverError(f"unhandled option_id={option_id}")
-                    col_spec["option_id"] = option_id
-                    col_specs.append(col_spec)
+            col_specs = ResultMessage.decode_col_specs(
+                result_flags, columns_count, body
+            )
             # <result_metadata>
             # <flags>
             result_flags = decode_int(body)
             # <columns_count>
             result_columns_count = decode_int(body)
             if result_flags & ResultFlags.HAS_MORE_PAGES != 0x00:
-                # parse paging state
-                pass
+                raise InternalDriverError(f"need to parse paging state")
             if result_flags & ResultFlags.NO_METADATA == 0x00:
                 if result_flags & ResultFlags.GLOBAL_TABLES_SPEC != 0x00:
                     # parse global_table_spec
@@ -567,8 +588,11 @@ class SetKeyspaceResultMessage(ResultMessage):
 
 
 class RowsResultMessage(ResultMessage):
-    def __init__(self, rows: "Rows", *args: Any) -> None:
+    def __init__(
+        self, rows: "Rows", *args: Any, col_specs: Optional[List[Dict[str, Any]]] = None
+    ) -> None:
         self.rows: "Rows" = rows
+        self.col_specs: Optional[List[Dict[str, Any]]] = col_specs
         super().__init__(*args)
 
 
@@ -585,7 +609,9 @@ class SchemaResultMessage(ResultMessage):
 class PreparedResultMessage(ResultMessage):
     query_id: bytes
 
-    def __init__(self, statement_id: bytes, col_specs: List[dict], *args: Any) -> None:
+    def __init__(
+        self, statement_id: bytes, col_specs: List[Dict[str, Any]], *args: Any
+    ) -> None:
         super().__init__(*args)
         self.col_specs = col_specs
         self.statement_id = statement_id
@@ -613,10 +639,16 @@ class ExecuteMessage(RequestMessage):
     opcode = Opcode.EXECUTE
 
     def __init__(
-        self, query_id: bytes, query_params: dict, col_specs: List[dict], *args: Any,
+        self,
+        query_id: bytes,
+        query_params: dict,
+        send_metadata: bool,
+        col_specs: List[dict],
+        *args: Any,
     ) -> None:
         self.query_id = query_id
         self.query_params = query_params
+        self.send_metadata = send_metadata
         self.col_specs = col_specs
         super().__init__(*args)
 
@@ -630,6 +662,9 @@ class ExecuteMessage(RequestMessage):
         body = encode_string(self.query_id)
         #   <query_parameters>
         #     <consistency><flags>
+        flags: int = QueryFlags.VALUES
+        if not self.send_metadata:
+            flags |= QueryFlags.SKIP_METADATA
         body += get_struct(f"{NETWORK_ORDER}{STypes.USHORT}{STypes.BYTE}").pack(
             Consitency.ONE, QueryFlags.VALUES
         )
@@ -659,15 +694,19 @@ class ExecuteMessage(RequestMessage):
 class QueryMessage(RequestMessage):
     opcode = Opcode.QUERY
 
-    def __init__(self, query: str, *args: Any) -> None:
+    def __init__(self, query: str, send_metadata: bool, *args: Any) -> None:
         self.query = query
+        self.send_metadata = send_metadata
         super().__init__(*args)
 
     def encode_body(self) -> bytes:
         body = encode_long_string(self.query)
+        flags = 0x00
+        if not self.send_metadata:
+            flags |= QueryFlags.SKIP_METADATA
         #   <consistency><flags>[<n>[name_1]<value_1>...[name_n]<value_n>][<result_page_size>][<paging_state>][<serial_consistency>][<timestamp>][<keyspace>][<now_in_seconds>]
         body += get_struct(f"{NETWORK_ORDER}{STypes.USHORT}{STypes.BYTE}").pack(
-            Consitency.ONE, QueryFlags.SKIP_METADATA
+            Consitency.ONE, flags
         )
         # query_body += pack("!HL", Consitency.ONE, 0x0002)
         return body

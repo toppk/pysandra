@@ -95,7 +95,9 @@ class SBytes(bytes):
             return self[curindex:]
 
         if self.my_index + count > len(self):
-            raise IndexError(f"cannot go beyond {len(self)}")
+            raise InternalDriverError(
+                f"cannot go beyond {len(self)} count={count} index={self.my_index} sbytes={self!r}"
+            )
         curindex = self.my_index
         self.my_index += count
         return self[curindex : curindex + count]

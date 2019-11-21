@@ -30,9 +30,9 @@ class Tester:
         # will never end
         print(f"========> FINISHED")
 
-    async def run_query(self, query):
+    async def run_query(self, query, send_metadata=False):
         print(f"========> RUNNING {query}")
-        resp = await self.client.execute(query)
+        resp = await self.client.execute(query, send_metadata=send_metadata)
         if isinstance(resp, Rows):
             for row in resp:
                 print(f"got row={row}")
@@ -46,12 +46,14 @@ class Tester:
             raise ValueError(f"unexpected response={resp}")
         print(f"========> FINISHED")
 
-    async def run_prepare(self, query, data):
+    async def run_prepare(self, query, data, send_metadata=False):
         print(f"========> PREPARING {query}")
         statement_id = await self.client.prepare(query)
         for entry in data:
             print(f"========> INSERTING {entry}")
-            resp = await self.client.execute(statement_id, entry)
+            resp = await self.client.execute(
+                statement_id, entry, send_metadata=send_metadata
+            )
             if isinstance(resp, bool):
                 print(f">>> got status={resp}")
             else:
@@ -85,6 +87,17 @@ async def test_bad(tester):
     except exceptions.ServerError as e:
         print(f">>> got ServerError exception={e}")
         print(f"========> FINISHED")
+
+
+async def test_meta(tester):
+    await tester.run_query(
+        "SELECT release_version FROM system.local", send_metadata=True
+    )
+    await tester.run_prepare(
+        "INSERT INTO  uprofile.user  (user_id, user_name , user_bcity) VALUES (?,?,?)",
+        [[45, "Trump", "Washington D.C."]],
+        send_metadata=True,
+    )
 
 
 async def test_dml(tester):
@@ -126,7 +139,7 @@ async def test_dupddl(tester):
 
 
 async def run(command, stop=False):
-    if command not in ("ddl", "dml", "full", "dupddl", "events", "use", "bad"):
+    if command not in ("ddl", "dml", "full", "dupddl", "events", "use", "bad", "meta"):
         print(f"ERROR:unknown command={command}")
         sys.exit(1)
     tester = Tester(Client(debug_signal=Signals.SIGUSR1))
@@ -135,6 +148,8 @@ async def run(command, stop=False):
         await test_ddl(tester)
     if command in ("dml", "full",):
         await test_dml(tester)
+    if command in ("meta", "full",):
+        await test_meta(tester)
     if command in ("bad",):
         await test_bad(tester)
     if command in ("use",):
