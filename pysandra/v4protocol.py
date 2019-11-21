@@ -36,6 +36,7 @@ class V4Protocol(Protocol):
 
     def __init__(self, default_flags: int = 0x00) -> None:
         self._default_flags = default_flags
+        self.compress: Optional[Callable] = None
         self._prepared: Dict[bytes, "PreparedResultMessage"] = {}
         self._events: Optional["Queue"] = None
 
@@ -61,6 +62,7 @@ class V4Protocol(Protocol):
             self.version,
             self.flags(),
             stream_id,
+            compress=self.compress,
         )
 
     def register(self, stream_id: int, params: dict) -> "RegisterMessage":
@@ -69,7 +71,13 @@ class V4Protocol(Protocol):
 
     def prepare(self, stream_id: int, params: dict) -> "PrepareMessage":
         assert params is not None
-        return PrepareMessage(params["query"], self.version, self.flags(), stream_id)
+        return PrepareMessage(
+            params["query"],
+            self.version,
+            self.flags(),
+            stream_id,
+            compress=self.compress,
+        )
 
     def execute(self, stream_id: int, params: dict) -> "ExecuteMessage":
         assert params is not None
@@ -88,6 +96,7 @@ class V4Protocol(Protocol):
             self.version,
             self.flags(),
             stream_id,
+            compress=self.compress,
         )
 
     async def event_handler(

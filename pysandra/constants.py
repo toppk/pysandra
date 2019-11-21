@@ -3,6 +3,9 @@ from enum import Enum
 
 # driver
 
+# in bytes
+COMPRESS_MINIMUM = 60
+
 # in seconds
 STARTUP_TIMEOUT = 10
 REQUEST_TIMEOUT = 10

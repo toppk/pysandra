@@ -76,7 +76,6 @@ Aims to be:
 * paging
 * improve tester
 * make user objects user friendly (exceptions, EventChage, Rows)
-* compression for requests
 * Tests
 * TLS
 * AUTH

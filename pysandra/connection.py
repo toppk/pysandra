@@ -70,6 +70,7 @@ class Connection:
         if "COMPRESSION" in self.options:
             logger.debug(f"setting dec2omress to algo={self.decompress}")
             self._dispatcher.decompress = self.decompress
+            self.protocol.compress = self.compress
         is_ready = await self.make_call(
             self.protocol.startup, self.protocol.build_response, params=params
         )
@@ -85,6 +86,11 @@ class Connection:
         if "COMPRESSION" not in self._options:
             raise InternalDriverError(f"no compression selected")
         return self._pkzip.decompress(data, self._options["COMPRESSION"])
+
+    def compress(self, data: bytes) -> bytes:
+        if "COMPRESSION" not in self._options:
+            raise InternalDriverError(f"no compression selected")
+        return self._pkzip.compress(data, self._options["COMPRESSION"])
 
     def make_choices(self, supported_options: Dict[str, List[str]]) -> None:
         self.supported_options = supported_options

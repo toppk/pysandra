@@ -1,12 +1,14 @@
 from enum import Enum
 from struct import Struct, pack, unpack
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 from .constants import (
+    COMPRESS_MINIMUM,
     SERVER_SENT,
     Consitency,
     ErrorCode,
     Events,
+    Flags,
     Kind,
     Opcode,
     OptionID,
@@ -202,6 +204,7 @@ def decode_string_multimap(sbytes: "SBytes") -> Dict[str, List[str]]:
 
 class Protocol:
     version: int
+    compress: Optional[Callable]
 
     def decode_header(self, header: bytes) -> Tuple[int, int, int, int, int]:
         version, flags, stream, opcode, length = get_struct(
@@ -266,13 +269,20 @@ class BaseMessage:
 class RequestMessage(BaseMessage):
     opcode: int
 
-    def __init__(self, version: int, flags: int, stream_id: int) -> None:
+    def __init__(
+        self, version: int, flags: int, stream_id: int, compress: Callable = None
+    ) -> None:
         self.version = version
         self.flags = flags
         self.stream_id = stream_id
+        self.compress = compress
 
     def __bytes__(self) -> bytes:
         body: bytes = self.encode_body()
+        if self.compress is not None and len(body) > COMPRESS_MINIMUM:
+            self.flags |= Flags.COMPRESSION
+            logger.debug("compressing the request")
+            body = self.compress(body)
         header: bytes = self.encode_header(len(body))
         logger.debug(f"opcode={self.opcode} header={header!r} body={body!r}")
         return header + body
@@ -620,9 +630,10 @@ class PreparedResultMessage(ResultMessage):
 class StartupMessage(RequestMessage):
     opcode = Opcode.STARTUP
 
-    def __init__(self, options: Dict[str, str], *args: Any) -> None:
-        super().__init__(*args)
+    def __init__(self, options: Dict[str, str], *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
         self.options = options
+        assert self.compress is None
 
     def encode_body(self) -> bytes:
         body = get_struct(f"{NETWORK_ORDER}{STypes.USHORT}").pack(len(self.options))
@@ -633,6 +644,10 @@ class StartupMessage(RequestMessage):
 
 class OptionsMessage(RequestMessage):
     opcode = Opcode.OPTIONS
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        assert self.compress is None
 
 
 class ExecuteMessage(RequestMessage):
@@ -645,12 +660,13 @@ class ExecuteMessage(RequestMessage):
         send_metadata: bool,
         col_specs: List[dict],
         *args: Any,
+        **kwargs: Any,
     ) -> None:
         self.query_id = query_id
         self.query_params = query_params
         self.send_metadata = send_metadata
         self.col_specs = col_specs
-        super().__init__(*args)
+        super().__init__(*args, **kwargs)
 
     def encode_body(self) -> bytes:
         # data check
@@ -694,10 +710,12 @@ class ExecuteMessage(RequestMessage):
 class QueryMessage(RequestMessage):
     opcode = Opcode.QUERY
 
-    def __init__(self, query: str, send_metadata: bool, *args: Any) -> None:
+    def __init__(
+        self, query: str, send_metadata: bool, *args: Any, **kwargs: Any
+    ) -> None:
         self.query = query
         self.send_metadata = send_metadata
-        super().__init__(*args)
+        super().__init__(*args, **kwargs)
 
     def encode_body(self) -> bytes:
         body = encode_long_string(self.query)
@@ -715,9 +733,9 @@ class QueryMessage(RequestMessage):
 class RegisterMessage(RequestMessage):
     opcode = Opcode.REGISTER
 
-    def __init__(self, events: List[Events], *args: Any) -> None:
+    def __init__(self, events: List[Events], *args: Any, **kwargs: Any) -> None:
         self.events = events
-        super().__init__(*args)
+        super().__init__(*args, **kwargs)
 
     def encode_body(self) -> bytes:
         checked: List[str] = []
@@ -734,9 +752,9 @@ class RegisterMessage(RequestMessage):
 class PrepareMessage(RequestMessage):
     opcode = Opcode.PREPARE
 
-    def __init__(self, query: str, *args: Any) -> None:
+    def __init__(self, query: str, *args: Any, **kwargs: Any) -> None:
         self.query = query
-        super().__init__(*args)
+        super().__init__(*args, **kwargs)
 
     def encode_body(self) -> bytes:
         return encode_long_string(self.query)

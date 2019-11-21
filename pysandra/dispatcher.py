@@ -84,11 +84,11 @@ class Dispatcher:
             await self._connect()
 
         stream_id = self._new_stream_id()
+        # should order compression
         request = request_handler(stream_id, params)
         event = asyncio.Event()
         self._update_stream_id(stream_id, (request, response_handler, event))
         assert self._writer is not None
-        # should order compression
         self._writer.write(bytes(request))
         return event
 

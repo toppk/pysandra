@@ -36,7 +36,7 @@
       4.2.6. EVENT - partial
       4.2.7. AUTH_CHALLENGE - not done
       4.2.8. AUTH_SUCCESS - not done
-  5. Compression - not done
+  5. Compression - done
   6. Data Type Serialization Formats - not done
   7. User Defined Type Serialization - not done
   8. Result paging - not done
