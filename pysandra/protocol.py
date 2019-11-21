@@ -638,8 +638,16 @@ class ExecuteMessage(RequestMessage):
         body += get_struct(f"{NETWORK_ORDER}{STypes.USHORT}").pack(len(self.col_specs))
         for value, spec in zip(self.query_params, self.col_specs):
             if spec["option_id"] == OptionID.INT:
+                if not isinstance(value, int):
+                    raise BadInputException(
+                        f"expected int but got type={type(value)} for value={value!r}"
+                    )
                 body += pack(f"{NETWORK_ORDER}{STypes.INT}{STypes.INT}", 4, value)
             elif spec["option_id"] == OptionID.VARCHAR:
+                if not isinstance(value, str):
+                    raise BadInputException(
+                        f"expected str but got type={type(value)} for value={value!r}"
+                    )
                 body += encode_long_string(value)
             else:
                 raise InternalDriverError(

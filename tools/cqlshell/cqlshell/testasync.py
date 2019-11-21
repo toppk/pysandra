@@ -64,8 +64,27 @@ async def test_use(tester):
         await tester.run_query("SELECT * FROM user where user_id=1")
     except exceptions.ServerError as e:
         print(f">>> got ServerError exception={e.msg.error_text}")
+        print(f"========> FINISHED")
     await tester.run_query("use uprofile")
     await tester.run_query("SELECT * FROM user where user_id=1")
+
+
+async def test_bad(tester):
+    try:
+        await tester.run_prepare(
+            "INSERT INTO  uprofile.user  (user_id, user_name , user_bcity) VALUES (?,?,?)",
+            [["hillary", 2, "Washington D.C."]],
+        )
+    except exceptions.BadInputException as e:
+        print(f">>> got BadInputException exception={e}")
+        print(f"========> FINISHED")
+    try:
+        await tester.run_query(
+            "INSERT INTO  uprofile.user (user_id, user_name , user_bcity) VALUES ('hillary', 2, 'DC')"
+        )
+    except exceptions.ServerError as e:
+        print(f">>> got ServerError exception={e}")
+        print(f"========> FINISHED")
 
 
 async def test_dml(tester):
@@ -107,7 +126,7 @@ async def test_dupddl(tester):
 
 
 async def run(command, stop=False):
-    if command not in ("ddl", "dml", "full", "dupddl", "events", "use"):
+    if command not in ("ddl", "dml", "full", "dupddl", "events", "use", "bad"):
         print(f"ERROR:unknown command={command}")
         sys.exit(1)
     tester = Tester(Client(debug_signal=Signals.SIGUSR1))
@@ -116,6 +135,8 @@ async def run(command, stop=False):
         await test_ddl(tester)
     if command in ("dml", "full",):
         await test_dml(tester)
+    if command in ("bad",):
+        await test_bad(tester)
     if command in ("use",):
         await test_use(tester)
     if command in ("dupddl",):

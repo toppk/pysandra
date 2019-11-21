@@ -44,6 +44,102 @@
   10. Changes from v3 - ignored
 
 ==== cql scope support
+http://cassandra.apache.org/doc/latest/cql/index.html
+vs
+
+https://github.com/apache/cassandra/blob/trunk/doc/cql3/CQL.textile
+
+
+    Definitions
+        Conventions
+        Identifiers and keywords
+        Constants
+        Terms
+        Comments
+        Statements
+        Prepared Statements
+    Data Types
+        Native Types
+        Working with timestamps
+        Working with dates
+        Working with times
+        Working with durations
+        Collections
+        User-Defined Types
+        Tuples
+        Custom Types
+    Data Definition
+        Common definitions
+        CREATE KEYSPACE
+        USE
+        ALTER KEYSPACE
+        DROP KEYSPACE
+        CREATE TABLE
+        ALTER TABLE
+        DROP TABLE
+        TRUNCATE
+    Data Manipulation
+        SELECT
+        INSERT
+        UPDATE
+        DELETE
+        BATCH
+    Secondary Indexes
+        CREATE INDEX
+        DROP INDEX
+    Materialized Views
+        CREATE MATERIALIZED VIEW
+        ALTER MATERIALIZED VIEW
+        DROP MATERIALIZED VIEW
+    Security
+        Database Roles
+        Users
+        Data Control
+    Functions
+        Scalar functions
+        Aggregate functions
+    Arithmetic Operators
+        Number Arithmetic
+        Datetime Arithmetic
+    JSON Support
+        SELECT JSON
+        INSERT JSON
+        JSON Encoding of Cassandra Data Types
+        The fromJson() Function
+        The toJson() Function
+    Triggers
+        CREATE TRIGGER
+        DROP TRIGGER
+    Appendices
+        Appendix A: CQL Keywords
+        Appendix B: CQL Reserved Types
+        Appendix C: Dropping Compact Storage
+    Changes
+        3.4.5
+        3.4.4
+        3.4.3
+        3.4.2
+        3.4.1
+        3.4.0
+        3.3.1
+        3.3.0
+        3.2.0
+        3.1.7
+        3.1.6
+        3.1.5
+        3.1.4
+        3.1.3
+        3.1.2
+        3.1.1
+        3.1.0
+        3.0.5
+        3.0.4
+        3.0.3
+        3.0.2
+        3.0.1
+        Versioning
+
+
 
 === Here are some thoughts on the protocol specification (currently using v4)
 
@@ -56,3 +152,8 @@ What is the license for the protocol documents?
 
 if options returns supoported method options={'PROTOCOL_VERSIONS': ['3/v3', '4/v4', '5/v5-beta'], 'COMPRESSION': ['snappy', 'lz4'], 'CQL_VERSION': ['3.4.4']}
 What is the correct CQL_VERSION (sec. 4.1.1).  If you send options first, what protocol_version should you used (sec 2.1)
+
+(sec 5)     # Cassandra writes the uncompressed message length in big endian order,
+            # but the lz4 lib requires little endian order, so we wrap these
+            # functions to handle that
+

@@ -69,10 +69,10 @@ class Client:
             await asyncio.wait_for(event.wait(), timeout=REQUEST_TIMEOUT)
         except asyncio.TimeoutError as e:
             raise RequestTimeout(e) from None
-        options = self._dispatcher.retrieve(event)
-        assert isinstance(options, dict)
-        self._conn.supported_options = options
-        logger.debug(f" sending Startup options={options}")
+        supported_options = self._dispatcher.retrieve(event)
+        assert isinstance(supported_options, dict)
+        self._conn.make_choices(supported_options)
+        logger.debug(f" sending Startup options={self._conn.options}")
         params = {"options": self._conn.options}
         event = await self._dispatcher.send(
             self.protocol.startup, self.protocol.build_response, params=params

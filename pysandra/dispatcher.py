@@ -3,7 +3,7 @@ import sys
 import traceback
 from typing import Callable, Dict, Optional, Tuple, Union
 
-from .constants import EVENT_STREAM_ID
+from .constants import EVENT_STREAM_ID, Flags
 from .exceptions import InternalDriverError, MaximumStreamsException, ServerError
 from .protocol import ErrorMessage, Protocol, RequestMessage  # noqa: F401
 from .types import Connection, ExpectedResponses  # noqa: F401
@@ -86,6 +86,7 @@ class Dispatcher:
         event = asyncio.Event()
         self._update_stream_id(stream_id, (request, response_handler, event))
         assert self._writer is not None
+        # should order compression
         self._writer.write(request.encode())
         return event
 
@@ -95,6 +96,11 @@ class Dispatcher:
         logger.debug(f"in _receive head={head!r}")
         version, flags, stream_id, opcode, length = self._proto.decode_header(head)
         body = await self._reader.read(length)
+        # should decompress
+        if flags & Flags.COMPRESSION:
+            logger.debug(f"body={body!r}")
+            body = self._conn.decompress(body)
+            logger.debug(f"body={body!r}")
         if stream_id == EVENT_STREAM_ID:
             await self._proto.event_handler(
                 version, flags, stream_id, opcode, length, body

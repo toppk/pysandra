@@ -72,9 +72,12 @@ Aims to be:
 
 ## Todos
 
+* get real data
+* send compression
 * Tests
 * TLS
 * AUTH
+* batch
 * cqlshell
 
 ## Developing
