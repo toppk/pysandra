@@ -30,9 +30,25 @@ class Tester:
         # will never end
         print(f"========> FINISHED")
 
-    async def run_query(self, query, send_metadata=False):
+    async def run_simple_query(self, query, send_metadata=False):
         print(f"========> RUNNING {query}")
         resp = await self.client.execute(query, send_metadata=send_metadata)
+        if isinstance(resp, Rows):
+            for row in resp:
+                print(f"got row={row}")
+        elif isinstance(resp, SchemaChange):
+            print(f">>> got schema_change={resp}")
+        elif isinstance(resp, bool):
+            print(f">>> got status={resp}")
+        elif isinstance(resp, str):
+            print(f">>> got state={resp}")
+        else:
+            raise ValueError(f"unexpected response={resp}")
+        print(f"========> FINISHED")
+
+    async def run_query(self, query, args=None, send_metadata=False):
+        print(f"========> RUNNING {query} args={args}")
+        resp = await self.client.execute(query, args, send_metadata=send_metadata)
         if isinstance(resp, Rows):
             for row in resp:
                 print(f"got row={row}")
@@ -50,10 +66,22 @@ class Tester:
         print(f"========> PREPARING {query}")
         statement_id = await self.client.prepare(query)
         for entry in data:
-            print(f"========> INSERTING {entry}")
+            print(f"========> EXECUTING {entry}")
             resp = await self.client.execute(
                 statement_id, entry, send_metadata=send_metadata
             )
+            if isinstance(resp, bool):
+                print(f">>> got status={resp}")
+            else:
+                raise ValueError(f"unexpected response={resp}")
+        print(f"========> FINISHED")
+
+    async def run_empty_prepare(self, query, count, send_metadata=False):
+        print(f"========> PREPARING {query}")
+        statement_id = await self.client.prepare(query)
+        for _entry in range(count):
+            print(f"========> INSERTING {_entry}")
+            resp = await self.client.execute(statement_id, send_metadata=send_metadata)
             if isinstance(resp, bool):
                 print(f">>> got status={resp}")
             else:
@@ -104,12 +132,24 @@ async def test_dml(tester):
     await tester.run_query("SELECT release_version FROM system.local")
     await tester.run_query("SELECT * FROM uprofile.user where user_id=1")
     await tester.run_prepare(
-        "INSERT INTO  uprofile.user  (user_id, user_name , user_bcity) VALUES (?,?,?)",
+        "INSERT INTO  uprofile.user  (user_id, user_name , user_bcity) VALUES (:id,:n,:c)",
         [[45, "Trump", "Washington D.C."]],
     )
     await tester.run_query("SELECT * FROM uprofile.user where user_id=45")
     await tester.run_query("DELETE FROM uprofile.user where user_id=45")
     await tester.run_query("SELECT * FROM uprofile.user where user_id=45")
+
+
+async def test_dml2(tester):
+    await tester.run_query("SELECT * FROM uprofile.user where user_id=?", (2,))
+    await tester.run_query("SELECT * FROM uprofile.user where user_id=:id", {"id": 3})
+    await tester.run_query("SELECT * FROM uprofile.user where user_id=:id", {"id": 45})
+    await tester.run_empty_prepare(
+        "INSERT INTO  uprofile.user  (user_id, user_name , user_bcity) VALUES (45, 'Trump', 'Washington D.C.')",
+        2,
+    )
+    await tester.run_query("SELECT * FROM uprofile.user where user_id=?", (45,))
+    await tester.run_simple_query("DELETE FROM uprofile.user where user_id=45")
 
 
 async def test_ddl(tester):
@@ -139,7 +179,17 @@ async def test_dupddl(tester):
 
 
 async def run(command, stop=False):
-    if command not in ("ddl", "dml", "full", "dupddl", "events", "use", "bad", "meta"):
+    if command not in (
+        "ddl",
+        "dml",
+        "full",
+        "dupddl",
+        "events",
+        "use",
+        "bad",
+        "meta",
+        "dml2",
+    ):
         print(f"ERROR:unknown command={command}")
         sys.exit(1)
     tester = Tester(Client(debug_signal=Signals.SIGUSR1))
@@ -152,6 +202,8 @@ async def run(command, stop=False):
         await test_meta(tester)
     if command in ("bad",):
         await test_bad(tester)
+    if command in ("dml2",):
+        await test_dml2(tester)
     if command in ("use",):
         await test_use(tester)
     if command in ("dupddl",):

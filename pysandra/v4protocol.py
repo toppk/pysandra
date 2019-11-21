@@ -58,6 +58,7 @@ class V4Protocol(Protocol):
         assert params is not None
         return QueryMessage(
             params["query"],
+            params["query_params"],
             params["send_metadata"],
             self.version,
             self.flags(),

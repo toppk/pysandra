@@ -158,4 +158,8 @@ What is the correct CQL_VERSION (sec. 4.1.1).  If you send options first, what p
             # functions to handle that
 
 
-# READY is compressed??? 
+# READY is compressed???
+
+* should I do execute with/o values?
+
+* extra data doesn't generate error messg

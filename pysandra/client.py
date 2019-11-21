@@ -1,7 +1,8 @@
 import asyncio
+from collections.abc import Iterable
 from os import getpid
 from signal import Signals
-from typing import Any, Callable, List, Optional, Tuple
+from typing import Any, Callable, List, Optional
 
 from .connection import Connection
 from .constants import REQUEST_TIMEOUT, STARTUP_TIMEOUT, Events  # noqa: F401
@@ -79,8 +80,9 @@ class Client:
 
     @online
     async def execute(
-        self, stmt: str, args: Tuple = None, send_metadata: bool = False
+        self, stmt: str, args: Optional[Iterable] = None, send_metadata: bool = False
     ) -> "ExpectedResponses":
+        logger.debug(f" in execte got args={args}")
         if isinstance(stmt, str):
             # query
             return await self._conn.make_call(

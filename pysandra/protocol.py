@@ -1,3 +1,4 @@
+from collections.abc import Collection
 from enum import Enum
 from struct import Struct, pack, unpack
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
@@ -132,6 +133,18 @@ def encode_string(value: Union[str, bytes]) -> bytes:
     else:
         value_bytes = value.encode("utf-8")
     return encode_short(len(value_bytes)) + pack(
+        f"{NETWORK_ORDER}{len(value_bytes)}{STypes.CHAR}", value_bytes
+    )
+
+
+def encode_value(value: Union[str, bytes, int]) -> bytes:
+    if isinstance(value, int):
+        value_bytes = encode_int(value)
+    elif isinstance(value, str):
+        value_bytes = value.encode("utf-8")
+    elif isinstance(value, dict):
+        value_bytes = value
+    return encode_int(len(value_bytes)) + pack(
         f"{NETWORK_ORDER}{len(value_bytes)}{STypes.CHAR}", value_bytes
     )
 
@@ -511,22 +524,22 @@ class ResultMessage(ResponseMessage):
             msg = VoidResultMessage(kind, version, flags, stream_id)
         elif kind == Kind.ROWS:
             result_flags = decode_int(body)
-            column_count = decode_int(body)
+            columns_count = decode_int(body)
             logger.debug(
-                f"ResultResponse result_flags={result_flags} column_count={column_count}"
+                f"ResultResponse result_flags={result_flags} columns_count={columns_count}"
             )
             if result_flags & ResultFlags.HAS_MORE_PAGES != 0x00:
                 # parse paging state
                 raise InternalDriverError(f"need to parse paging state")
-            col_specs: Optional[List[Dict[str, Any]]] = None
-            if result_flags & ResultFlags.NO_METADATA == 0x00:
+            col_specs = None
+            if (result_flags & ResultFlags.NO_METADATA) == 0x00 and columns_count > 0:
                 col_specs = ResultMessage.decode_col_specs(
-                    result_flags, column_count, body
+                    result_flags, columns_count, body
                 )
             # parse rows
-            rows = Rows(column_count=column_count)
+            rows = Rows(columns_count=columns_count)
             rows_count = decode_int(body)
-            for _cnt in range(rows_count * column_count):
+            for _cnt in range(rows_count * columns_count):
                 rows.add(decode_int_bytes(body))
             msg = RowsResultMessage(
                 rows, kind, version, flags, stream_id, col_specs=col_specs
@@ -547,7 +560,7 @@ class ResultMessage(ResponseMessage):
             columns_count = decode_int(body)
             # <pk_count>
             pk_count = decode_int(body)
-            pk_index = None
+            pk_index: List[int] = []
             if pk_count > 0:
                 pk_index = list(
                     unpack(
@@ -564,20 +577,35 @@ class ResultMessage(ResponseMessage):
             )
             # <result_metadata>
             # <flags>
-            result_flags = decode_int(body)
+            results_result_flags = decode_int(body)
             # <columns_count>
-            result_columns_count = decode_int(body)
+            results_columns_count = decode_int(body)
             if result_flags & ResultFlags.HAS_MORE_PAGES != 0x00:
                 raise InternalDriverError(f"need to parse paging state")
-            if result_flags & ResultFlags.NO_METADATA == 0x00:
-                if result_flags & ResultFlags.GLOBAL_TABLES_SPEC != 0x00:
-                    # parse global_table_spec
-                    pass
-                # parse col_spec_i
-                for _col in range(result_columns_count):
-                    pass
+
+            if bool(results_result_flags & ResultFlags.NO_METADATA) != bool(
+                results_columns_count == 0
+            ):
+                raise InternalDriverError(
+                    f" unexpected results_result_flags={results_result_flags} results_columns_count={results_columns_count}"
+                )
+            results_col_specs = None
+            if (
+                results_result_flags & ResultFlags.NO_METADATA == 0x00
+                and results_columns_count > 0
+            ):
+                results_col_specs = ResultMessage.decode_col_specs(
+                    results_result_flags, results_columns_count, body
+                )
             msg = PreparedResultMessage(
-                statement_id, col_specs, kind, version, flags, stream_id
+                statement_id,
+                col_specs,
+                pk_index,
+                kind,
+                version,
+                flags,
+                stream_id,
+                results_col_specs=results_col_specs,
             )
         elif kind == Kind.SCHEMA_CHANGE:
             schema_change = EventMessage.decode_schema_change(body)
@@ -620,10 +648,17 @@ class PreparedResultMessage(ResultMessage):
     query_id: bytes
 
     def __init__(
-        self, statement_id: bytes, col_specs: List[Dict[str, Any]], *args: Any
+        self,
+        statement_id: bytes,
+        col_specs: List[Dict[str, Any]],
+        pk_index: List[int],
+        *args: Any,
+        results_col_specs: Optional[List[Dict[str, Any]]] = None,
     ) -> None:
         super().__init__(*args)
+        self.pk_index = pk_index
         self.col_specs = col_specs
+        self.results_col_specs: Optional[List[Dict[str, Any]]] = results_col_specs
         self.statement_id = statement_id
 
 
@@ -656,54 +691,36 @@ class ExecuteMessage(RequestMessage):
     def __init__(
         self,
         query_id: bytes,
-        query_params: dict,
+        query_params: Optional["Collection"],
         send_metadata: bool,
         col_specs: List[dict],
         *args: Any,
         **kwargs: Any,
     ) -> None:
         self.query_id = query_id
+        if query_params is None:
+            query_params = []
         self.query_params = query_params
         self.send_metadata = send_metadata
         self.col_specs = col_specs
         super().__init__(*args, **kwargs)
 
     def encode_body(self) -> bytes:
-        # data check
-        if len(self.col_specs) != len(self.query_params):
-            raise BadInputException(
-                f" count of execute params={len(self.query_params)} doesn't match prepared statement count={len(self.col_specs)}"
-            )
         # <id>
         body = encode_string(self.query_id)
         #   <query_parameters>
         #     <consistency><flags>
-        flags: int = QueryFlags.VALUES
-        if not self.send_metadata:
-            flags |= QueryFlags.SKIP_METADATA
-        body += get_struct(f"{NETWORK_ORDER}{STypes.USHORT}{STypes.BYTE}").pack(
-            Consitency.ONE, QueryFlags.VALUES
+        # data check
+        if self.col_specs is not None and len(self.col_specs) != len(self.query_params):
+            raise BadInputException(
+                f" count of execute params={len(self.query_params)} doesn't match prepared statement count={len(self.col_specs)}"
+            )
+        body += QueryMessage.encode_query_parameters(
+            self.query_params, self.send_metadata, col_specs=self.col_specs
         )
+
         #     [<n>[name_1]<value_1>...[name_n]<value_n>][<result_page_size>][<paging_state>][<serial_consistency>][<timestamp>]
         # <n>
-        body += get_struct(f"{NETWORK_ORDER}{STypes.USHORT}").pack(len(self.col_specs))
-        for value, spec in zip(self.query_params, self.col_specs):
-            if spec["option_id"] == OptionID.INT:
-                if not isinstance(value, int):
-                    raise BadInputException(
-                        f"expected int but got type={type(value)} for value={value!r}"
-                    )
-                body += pack(f"{NETWORK_ORDER}{STypes.INT}{STypes.INT}", 4, value)
-            elif spec["option_id"] == OptionID.VARCHAR:
-                if not isinstance(value, str):
-                    raise BadInputException(
-                        f"expected str but got type={type(value)} for value={value!r}"
-                    )
-                body += encode_long_string(value)
-            else:
-                raise InternalDriverError(
-                    f"cannot handle unknown option_id={spec['option_id']}"
-                )
         return body
 
 
@@ -711,22 +728,86 @@ class QueryMessage(RequestMessage):
     opcode = Opcode.QUERY
 
     def __init__(
-        self, query: str, send_metadata: bool, *args: Any, **kwargs: Any
+        self,
+        query: str,
+        query_params: Optional["Collection"],
+        send_metadata: bool,
+        *args: Any,
+        **kwargs: Any,
     ) -> None:
         self.query = query
+        if query_params is None:
+            query_params = []
+        self.query_params: "Collection" = query_params
         self.send_metadata = send_metadata
         super().__init__(*args, **kwargs)
 
-    def encode_body(self) -> bytes:
-        body = encode_long_string(self.query)
-        flags = 0x00
-        if not self.send_metadata:
-            flags |= QueryFlags.SKIP_METADATA
+    # used by ExecuteMessage and QueryMessage
+    @staticmethod
+    def encode_query_parameters(
+        query_params: "Collection",
+        send_metadata: bool,
+        col_specs: Optional[List[dict]] = None,
+    ) -> bytes:
+
+        body: bytes = b""
         #   <consistency><flags>[<n>[name_1]<value_1>...[name_n]<value_n>][<result_page_size>][<paging_state>][<serial_consistency>][<timestamp>][<keyspace>][<now_in_seconds>]
+        flags: int = 0x00
+        if len(query_params) > 0:
+            flags |= QueryFlags.VALUES
+            if isinstance(query_params, dict):
+                flags |= QueryFlags.WITH_NAMES_FOR_VALUES
+        if not send_metadata:
+            flags |= QueryFlags.SKIP_METADATA
         body += get_struct(f"{NETWORK_ORDER}{STypes.USHORT}{STypes.BYTE}").pack(
             Consitency.ONE, flags
         )
-        # query_body += pack("!HL", Consitency.ONE, 0x0002)
+        if len(query_params) > 0:
+            body += encode_short(len(query_params))
+            if col_specs is not None:
+                if isinstance(query_params, dict):
+                    raise InternalDriverError(
+                        "query_params with bind parameters not supported for prepared statement"
+                    )
+
+                for value, spec in zip(query_params, col_specs):
+                    if spec["option_id"] == OptionID.INT:
+                        if not isinstance(value, int):
+                            raise BadInputException(
+                                f"expected int but got type={type(value)} for value={value!r}"
+                            )
+                        body += pack(
+                            f"{NETWORK_ORDER}{STypes.INT}{STypes.INT}", 4, value
+                        )
+                    elif spec["option_id"] == OptionID.VARCHAR:
+                        if not isinstance(value, str):
+                            raise BadInputException(
+                                f"expected str but got type={type(value)} for value={value!r}"
+                            )
+                        body += encode_long_string(value)
+                    else:
+                        raise InternalDriverError(
+                            f"cannot handle unknown option_id={spec['option_id']}"
+                        )
+            else:
+                if isinstance(query_params, dict):
+                    # [name_n]<value_n>
+                    for key, value in query_params.items():
+                        body += encode_string(key) + encode_value(value)
+                else:
+                    # <value_n>
+                    for value in query_params:
+                        body += encode_value(value)
+        logger.debug(
+            f"lets' see the body={body!r} query_params={query_params} flags={flags}"
+        )
+        return body
+
+    def encode_body(self) -> bytes:
+        body = encode_long_string(self.query)
+        body += QueryMessage.encode_query_parameters(
+            self.query_params, self.send_metadata
+        )
         return body
 
 

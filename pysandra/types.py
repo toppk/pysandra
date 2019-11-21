@@ -37,10 +37,10 @@ class SchemaChange(ChangeEvent):
 
 
 class Rows:
-    def __init__(self, column_count: int) -> None:
+    def __init__(self, columns_count: int) -> None:
         self.index: int = 0
         self._data: List[Optional[bytes]] = []
-        self.column_count = column_count
+        self.columns_count = columns_count
 
     def __iter__(self) -> "Rows":
         return self
@@ -53,13 +53,13 @@ class Rows:
             # reset
             self.index = 0
             raise StopIteration
-        current = self._data[self.index : self.index + self.column_count]
-        self.index += self.column_count
+        current = self._data[self.index : self.index + self.columns_count]
+        self.index += self.columns_count
         return current
 
 
 if __name__ == "__main__":
-    d = Rows(column_count=2)
+    d = Rows(columns_count=2)
     d.add(b"1")
     d.add(b"2")
     d.add(b"3")
