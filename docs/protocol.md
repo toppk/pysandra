@@ -157,3 +157,5 @@ What is the correct CQL_VERSION (sec. 4.1.1).  If you send options first, what p
             # but the lz4 lib requires little endian order, so we wrap these
             # functions to handle that
 
+
+# READY is compressed??? 

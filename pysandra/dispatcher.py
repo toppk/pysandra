@@ -3,7 +3,6 @@ import sys
 import traceback
 from typing import Callable, Dict, Optional, Tuple, Union
 
-from .connection import Connection  # noqa
 from .constants import EVENT_STREAM_ID, Flags
 from .exceptions import InternalDriverError, MaximumStreamsException, ServerError
 from .protocol import ErrorMessage, Protocol, RequestMessage  # noqa: F401
@@ -14,10 +13,11 @@ logger = get_logger(__name__)
 
 
 class Dispatcher:
-    def __init__(self, protocol: "Protocol", connection: "Connection") -> None:
-        self._conn = connection
+    def __init__(self, protocol: "Protocol", host: str, port: int) -> None:
         assert protocol is not None
         self._proto = protocol
+        self._host = host
+        self._port = port
         self._data: Dict[
             "asyncio.Event",
             Union["ExpectedResponses", "InternalDriverError", "ServerError"],
@@ -25,6 +25,7 @@ class Dispatcher:
         self._streams: Dict[
             int, Optional[Tuple["RequestMessage", Callable, asyncio.Event]]
         ] = {}
+        self.decompress: Optional[Callable] = None
         self._connected = False
         self._running = False
         self._last_stream_id: Optional[int] = None
@@ -100,7 +101,8 @@ class Dispatcher:
         # should decompress
         if flags & Flags.COMPRESSION:
             logger.debug(f"body={body!r}")
-            body = self._conn.decompress(body)
+            assert self.decompress is not None
+            body = self.decompress(body)
             logger.debug(f"body={body!r}")
         if stream_id == EVENT_STREAM_ID:
             await self._proto.event_handler(
@@ -146,7 +148,7 @@ class Dispatcher:
 
     async def _connect(self) -> None:
         self._reader, self._writer = await asyncio.open_connection(
-            self._conn.host, self._conn.port
+            self._host, self._port
         )
         self._connected = True
         # avoid create_task for 3.6 compatability
@@ -166,7 +168,7 @@ class Dispatcher:
 if __name__ == "__main__":
     from .v4protocol import V4Protocol
 
-    client = Dispatcher(V4Protocol(), Connection())
+    client = Dispatcher(V4Protocol(), "", 0)
     move = 0
     while True:
         move += 1
