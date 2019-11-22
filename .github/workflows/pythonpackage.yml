@@ -32,4 +32,4 @@ jobs:
         nox -s check
     - name: NOX framework test
       run: |
-        nox -s test-${{ matrix.python-version }}
+        nox -s test-${{ matrix.python-version }} -- -m "not live"
