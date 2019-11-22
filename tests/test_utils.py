@@ -114,13 +114,8 @@ def test_logging_debugon(caplog):
     import pysandra.utils
 
     pysandra.utils._LOGGER_INITIALIZED = False
-    current = os.environ.get("PYSANDRA_LOG_LEVEL")
     os.environ["PYSANDRA_LOG_LEVEL"] = "DEBUG"
     logger = get_logger("pysandra.pytest_")
-    if current is None:
-        del os.environ["PYSANDRA_LOG_LEVEL"]
-    else:
-        os.environ["PYSANDRA_LOG_LEVEL"] = current
     string = "this is a long string!"
     logger.debug(string)
     assert string in caplog.text
