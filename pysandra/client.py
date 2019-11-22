@@ -51,6 +51,9 @@ class Client:
         logger.debug(f" adding debug handler at signal={signal!r} for pid={getpid()}")
         loop.add_signal_handler(signal, self._dump_state)
 
+    def is_connected(self) -> bool:
+        return self._conn.is_ready
+
     async def connect(self) -> None:
         if not self._conn.is_ready:
             if await self._conn.startup():
