@@ -23,9 +23,8 @@ Contributions, advice welcome, development coodinated on github
 <p align="center"><strong>pysandra</strong> <em>- An asyncio based Cassandra client for Python.</em></p>
 
 <p align="center">
-
 <a href="https://actions-badge.atrox.dev/toppk/pysandra/goto?ref=master"><img alt="Build Status" src="https://github.com/toppk/pysandra/workflows/Build%20Status/badge.svg" /></a>
-
+<a href="https://codecov.io/gh/toppk/pysandra"><img src="https://codecov.io/gh/toppk/pysandra/branch/master/graph/badge.svg" alt="Coverage"></a>
 <a href="https://pypi.org/project/pysandra/"><img src="https://badge.fury.io/py/pysandra.svg" alt="Package version"></a>
 </p>
 
@@ -73,9 +72,8 @@ Aims to be:
 
 * get real data
 * paging
-* improve tester
-* make user objects user friendly (exceptions, EventChage, Rows)
 * Tests
+* make user objects user friendly (exceptions, EventChage, Rows)
 * TLS
 * AUTH
 * batch
