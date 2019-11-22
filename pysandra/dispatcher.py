@@ -51,7 +51,9 @@ class Dispatcher:
         if last_id is None:
             next_id = 0x00
         elif len(self._streams) > maxstream:
-            raise MaximumStreamsException
+            raise MaximumStreamsException(
+                f"too many streams last_id={last_id} length={len(self._streams)}"
+            )
         else:
             next_id = last_id + 1
             while True:
@@ -163,26 +165,3 @@ class Dispatcher:
             self._read_task.cancel()
         # cannot use wait_closed for 3.6 compatability
         # await self._writer.wait_closed()
-
-
-if __name__ == "__main__":
-    from .v4protocol import V4Protocol
-
-    client = Dispatcher(V4Protocol(), "", 0)
-    move = 0
-    while True:
-        move += 1
-        try:
-            streamid = client._new_stream_id()
-        except MaximumStreamsException as e:
-            print(len(client._streams))
-            raise e
-        print("got new streamid=%s" % streamid)
-        client._update_stream_id(
-            streamid,
-            (RequestMessage(0, 0, 0), client._proto.build_response, asyncio.Event()),
-        )
-        if (move % 19) == 0:
-
-            print("remove streamid = %s" % streamid)
-            client._rm_stream_id(streamid)

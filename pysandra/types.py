@@ -56,15 +56,3 @@ class Rows:
         current = self._data[self.index : self.index + self.columns_count]
         self.index += self.columns_count
         return current
-
-
-if __name__ == "__main__":
-    d = Rows(columns_count=2)
-    d.add(b"1")
-    d.add(b"2")
-    d.add(b"3")
-    d.add(b"4")
-    for row in d:
-        print(f"got row={row}")
-    for row in d:
-        print(f"got row={row}")

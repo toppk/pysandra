@@ -103,34 +103,3 @@ class SBytes(bytes):
     @property
     def remaining(self) -> bytes:
         return self[self._index :]
-
-
-if __name__ == "__main__":
-    t = SBytes(b"12345")
-    print(f"{t.grab(1)!r}{t.at_end()}")
-    print(f"{t.grab(3)!r}{t.at_end()}")
-    print(f"{t.grab(1)!r}{t.at_end()}")
-
-    pkzip = PKZip()
-    algo = "lz4"
-    cdata = b"\x00\x00\x00\x04@\x00\x00\x00\x01"
-    res = pkzip.decompress(cdata, algo)
-    print(f" res={res!r} for cdata={cdata!r} algo={algo}")
-    cdata = pkzip.compress(res, algo)
-    print(f" res={res!r} for cdata={cdata!r} algo={algo}")
-
-    print(f"supported={pkzip.supported}")
-    data = b"asdfasdfa12311111111111234234dfasdfsdfasdfasdf"
-    algo = "snappy"
-    res = pkzip.compress(data, algo)
-    print(f" res={len(res)} for data={len(data)} algo={algo}")
-    algo = "lz4"
-    res = pkzip.compress(data, algo)
-    print(f" res={len(res)} for data={len(data)} algo={algo}")
-    data = b""
-    algo = "lz4"
-    res = pkzip.compress(data, algo)
-    print(f" res={res!r} for data={data!r} algo={algo}")
-    algo = "snappy"
-    res = pkzip.compress(data, algo)
-    print(f" res={res!r} for data={data!r} algo={algo}")
