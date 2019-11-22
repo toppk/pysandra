@@ -16,7 +16,7 @@ __all__ = [
 ]
 
 
-logger.warn(
+logger.warning(
     "***WARNING*** This software is in an early development state.  "
     "There will be bugs and major features missing.  "
     "Please see http://github.com/toppk/pysandra for details!!!"
