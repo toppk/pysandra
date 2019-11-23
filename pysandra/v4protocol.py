@@ -2,6 +2,7 @@ from asyncio import Queue
 from typing import Callable, Dict, Optional
 
 from .constants import Opcode
+from .core import SBytes
 from .exceptions import ServerError  # noqa: F401
 from .exceptions import InternalDriverError, UnknownPayloadException
 from .protocol import (
@@ -26,7 +27,7 @@ from .protocol import (
     VoidResultMessage,
 )
 from .types import ExpectedResponses  # noqa: F401
-from .utils import SBytes, get_logger
+from .utils import get_logger
 
 logger = get_logger(__name__)
 

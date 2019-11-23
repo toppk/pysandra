@@ -17,6 +17,7 @@ from .constants import (
     ResultFlags,
     SchemaChangeTarget,
 )
+from .core import SBytes
 from .exceptions import (
     BadInputException,
     InternalDriverError,
@@ -25,7 +26,7 @@ from .exceptions import (
     VersionMismatchException,
 )
 from .types import ChangeEvent, ExpectedResponses, Rows, SchemaChange, SchemaChangeType
-from .utils import SBytes, get_logger
+from .utils import get_logger
 
 logger = get_logger(__name__)
 

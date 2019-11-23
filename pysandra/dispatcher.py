@@ -2,15 +2,11 @@ import asyncio
 import ssl
 import sys
 import traceback
-from typing import Callable, Dict, List, Optional, Tuple, Union
+from typing import Callable, Dict, Optional, Tuple, Union
 
 from .constants import EVENT_STREAM_ID, Flags
-from .exceptions import (
-    ConnectionDroppedError,
-    InternalDriverError,
-    MaximumStreamsException,
-    ServerError,
-)
+from .core import Streams
+from .exceptions import ConnectionDroppedError, InternalDriverError, ServerError
 from .protocol import ErrorMessage, Protocol, RequestMessage  # noqa: F401
 from .types import ExpectedResponses  # noqa: F401
 from .utils import get_logger
@@ -36,65 +32,15 @@ class Dispatcher:
             "asyncio.Event",
             Union["ExpectedResponses", "InternalDriverError", "ServerError"],
         ] = {}
-        self._streams: Dict[
-            int, Optional[Tuple["RequestMessage", Callable, asyncio.Event]]
-        ] = {}
+        self._streams: Streams[
+            Tuple["RequestMessage", Callable, asyncio.Event]
+        ] = Streams()
         self.decompress: Optional[Callable] = None
         self._connected = False
         self._running = False
-        self._last_stream_id: Optional[int] = None
         self._writer: Optional["asyncio.StreamWriter"] = None
         self._reader: Optional["asyncio.StreamReader"] = None
         self._read_task: Optional["asyncio.Future"] = None
-
-    def _list_stream_ids(self) -> List[int]:
-        return list(self._streams.keys())
-
-    def _rm_stream_id(
-        self, stream_id: int
-    ) -> Tuple["RequestMessage", Callable, asyncio.Event]:
-        try:
-            store = self._streams.pop(stream_id)
-            assert store is not None
-            return store
-        except KeyError:
-            raise InternalDriverError(
-                f"stream_id={stream_id} is not open", stream_id=stream_id
-            )
-
-    def _new_stream_id(self) -> int:
-        maxstream = 2 ** 15
-        last_id = self._last_stream_id
-        if last_id is None:
-            next_id = 0x00
-        elif len(self._streams) > maxstream:
-            raise MaximumStreamsException(
-                f"too many streams last_id={last_id} length={len(self._streams)}"
-            )
-        else:
-            next_id = last_id + 1
-            while True:
-                if next_id > maxstream:
-                    next_id = 0x00
-                if next_id not in self._streams:
-                    break
-                # print("cannot use %s" % next_id)
-                next_id = next_id + 1
-        if next_id is None:
-            raise InternalDriverError("next_id cannot be None")
-        # store will come in later
-        self._streams[next_id] = None
-        self._last_stream_id = next_id
-        return next_id
-
-    def _update_stream_id(
-        self, stream_id: int, store: Tuple["RequestMessage", Callable, asyncio.Event]
-    ) -> None:
-        if stream_id not in self._streams:
-            raise InternalDriverError(f"stream_id={stream_id} not being tracked")
-        if store is None:
-            raise InternalDriverError("cannot store empty request")
-        self._streams[stream_id] = store
 
     async def send(
         self, request_handler: Callable, response_handler: Callable, params: dict = None
@@ -102,11 +48,11 @@ class Dispatcher:
         if not self._connected:
             await self._connect()
 
-        stream_id = self._new_stream_id()
+        stream_id = self._streams.create()
         # should order compression
         request = request_handler(stream_id, params)
         event = asyncio.Event()
-        self._update_stream_id(stream_id, (request, response_handler, event))
+        self._streams.update(stream_id, (request, response_handler, event))
         assert self._writer is not None
         self._writer.write(bytes(request))
         return event
@@ -131,7 +77,7 @@ class Dispatcher:
                 version, flags, stream_id, opcode, length, body
             )
         else:
-            request, response_handler, event = self._rm_stream_id(stream_id)
+            request, response_handler, event = self._streams.remove(stream_id)
             # exceptions are stashed here (in the wrong task)
             try:
                 self._data[event] = response_handler(
@@ -165,8 +111,8 @@ class Dispatcher:
             # logger.warning(f" connection dropped, going to close")
             self._running = False
             # close all requests
-            for stream_id in self._list_stream_ids():
-                _req, _resp_handler, event = self._rm_stream_id(stream_id)
+            for stream_id in self._streams.items():
+                _req, _resp_handler, event = self._streams.remove(stream_id)
                 self._data[event] = e
                 event.set()
             self._reader = None

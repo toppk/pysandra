@@ -3,47 +3,17 @@ import os
 import pytest
 
 from pysandra.exceptions import InternalDriverError
-from pysandra.utils import PKZip, SBytes, get_logger
-
-
-def test_sbytes_at_end():
-    t = SBytes(b"12345")
-    print(f"{t.grab(1)!r}{t.at_end()}")
-    print(f"{t.grab(3)!r}{t.at_end()}")
-    print(f"{t.grab(1)!r}{t.at_end()}")
-    assert t.at_end()
-
-
-def test_sbytes_hex():
-    t = SBytes(b"\x03\13\45")
-    assert t.hex() == "0x030b25"
-
-
-def test_sbytes_remaining():
-    t = SBytes(b"\x03\13\45")
-    t.grab(2)
-
-    assert t.remaining == b"%"
-
-
-def test_sbytes_not_end():
-    t = SBytes(b"12345")
-    print(f"{t.grab(1)!r}{t.at_end()}")
-    print(f"{t.grab(3)!r}{t.at_end()}")
-    assert not t.at_end()
-
-
-def test_sbytes_overflow():
-    with pytest.raises(InternalDriverError, match=r"cannot go beyond"):
-        t = SBytes(b"12345")
-        print(f"{t.grab(1)!r}{t.at_end()}")
-        print(f"{t.grab(3)!r}{t.at_end()}")
-        print(f"{t.grab(2)!r}{t.at_end()}")
+from pysandra.utils import PKZip, get_logger
 
 
 @pytest.fixture
 def pkzip():
     return PKZip()
+
+
+def test_pkzip_lz4_supported(pkzip):
+    algos = sorted(pkzip.supported)
+    assert algos == ["lz4", "snappy"]
 
 
 def test_pkzip_lz4_decompress(pkzip):

@@ -2,7 +2,7 @@ import logging
 import os
 import sys
 from struct import Struct
-from typing import List, Type, cast
+from typing import List
 
 from .exceptions import InternalDriverError
 
@@ -76,30 +76,3 @@ def get_logger(name: str) -> logging.Logger:
             logger.addHandler(handler)
 
     return logging.getLogger(name)
-
-
-class SBytes(bytes):
-    _index: int = 0
-
-    def __new__(cls: Type[bytes], val: bytes) -> "SBytes":
-        return cast(SBytes, super().__new__(cls, val))  # type: ignore # https://github.com/python/typeshed/issues/2630
-
-    def hex(self) -> str:
-        return "0x" + super().hex()
-
-    def grab(self, count: int) -> bytes:
-        assert self._index is not None
-        if self._index + count > len(self):
-            raise InternalDriverError(
-                f"cannot go beyond {len(self)} count={count} index={self._index} sbytes={self!r}"
-            )
-        curindex = self._index
-        self._index += count
-        return self[curindex : curindex + count]
-
-    def at_end(self) -> bool:
-        return self._index == len(self)
-
-    @property
-    def remaining(self) -> bytes:
-        return self[self._index :]
