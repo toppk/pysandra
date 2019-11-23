@@ -101,7 +101,7 @@ class Connection:
                     for algo in self._pkzip.supported
                     if algo in self.supported_options["COMPRESSION"]
                 ]
-                if len(matches) > 1:
+                if len(matches) > 0:
                     select = (
                         self.preferred_algo
                         if self.preferred_algo in matches
