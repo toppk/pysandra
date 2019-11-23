@@ -1,39 +1,41 @@
+import importlib
 import logging
 import os
 import sys
 from struct import Struct
-from typing import List
+from types import ModuleType
+from typing import Any, List, Optional
 
 from .exceptions import InternalDriverError
 
-_LOGGER_INITIALIZED = False
 
-HAS_SNAPPY = True
-try:
-    import snappy
-except ImportError:
-    HAS_SNAPPY = False
-
-HAS_LZ4 = True
-try:
-    import lz4.block
-except ImportError:
-    HAS_LZ4 = False
+# this voodoo was just to get pytest coverage at 100%
+def fetch_module(name: str) -> Optional[ModuleType]:
+    try:
+        return importlib.import_module(name)
+    except ModuleNotFoundError:
+        return None
 
 
 class PKZip:
     def __init__(self) -> None:
         packer = Struct("!l").pack
         supported = {}
-        if HAS_SNAPPY:
+        snappy: Any = fetch_module("snappy")
+        if snappy is not None:
+            assert hasattr(snappy, "compress")
+            assert hasattr(snappy, "uncompress")
             supported["snappy"] = (snappy.compress, snappy.uncompress)
-        if HAS_LZ4:
+        lz4_block: Any = fetch_module("lz4.block")
+        if lz4_block is not None:
+            assert hasattr(lz4_block, "compress")
+            assert hasattr(lz4_block, "decompress")
             # Cassandra writes the uncompressed message length in big endian order,
             # but the lz4 lib requires little endian order, so we wrap these
             # functions to handle that
             supported["lz4"] = (
-                lambda x: packer(len(x)) + lz4.block.compress(x)[4:],
-                lambda x: lz4.block.decompress(x[3::-1] + x[4:]),
+                lambda x: packer(len(x)) + lz4_block.compress(x)[4:],
+                lambda x: lz4_block.decompress(x[3::-1] + x[4:]),
             )
         self._supported = supported
 
@@ -50,6 +52,9 @@ class PKZip:
         if algo not in self._supported:
             raise InternalDriverError(f"not supported algo={algo}")
         return self._supported[algo][1](cdata)
+
+
+_LOGGER_INITIALIZED = False
 
 
 def get_logger(name: str) -> logging.Logger:

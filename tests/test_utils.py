@@ -3,12 +3,16 @@ import os
 import pytest
 
 from pysandra.exceptions import InternalDriverError
-from pysandra.utils import PKZip, get_logger
+from pysandra.utils import PKZip, fetch_module, get_logger
 
 
 @pytest.fixture
 def pkzip():
     return PKZip()
+
+
+def test_import_failure():
+    assert fetch_module("xzcvzxcv") is None
 
 
 def test_pkzip_lz4_supported(pkzip):
