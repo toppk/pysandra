@@ -2,7 +2,7 @@ import asyncio
 from collections.abc import Iterable
 from os import getpid
 from signal import Signals
-from typing import Any, Callable, List, Optional
+from typing import Any, Callable, List, Optional, Tuple
 
 from .connection import Connection
 from .constants import REQUEST_TIMEOUT, STARTUP_TIMEOUT, Events  # noqa: F401
@@ -23,10 +23,15 @@ def online(f: Callable) -> Callable:
 
 
 class Client:
-    def __init__(self, debug_signal: Optional["Signals"] = None) -> None:
+    def __init__(
+        self,
+        host: Optional[Tuple[str, int]] = None,
+        use_tls: bool = False,
+        debug_signal: Optional["Signals"] = None,
+    ) -> None:
         # this protocol will never be used, just placating mypy
         self._proto: "Protocol" = Protocol()
-        self._conn = Connection()
+        self._conn = Connection(host=host, use_tls=use_tls)
         self._is_ready = False
         self._in_startup = False
         self._is_ready_event = asyncio.Event()

@@ -74,7 +74,6 @@ Aims to be:
 * paging
 * Tests
 * make user objects user friendly (exceptions, EventChage, Rows)
-* TLS
 * AUTH
 * batch
 * cqlshell

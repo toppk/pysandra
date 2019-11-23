@@ -44,6 +44,10 @@ class ServerError(DriverError):
     pass
 
 
+class ConnectionDroppedError(ServerError):
+    pass
+
+
 class VersionMismatchException(ServerError):
     pass
 

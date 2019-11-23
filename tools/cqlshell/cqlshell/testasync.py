@@ -140,6 +140,24 @@ async def test_dml(tester):
     await tester.run_query("SELECT * FROM uprofile.user where user_id=45")
 
 
+async def test_tls(tester):
+    await tester.close()
+    # tester = Tester(Client(host=("127.0.0.1", 9042), use_tls=False, debug_signal=Signals.SIGUSR1))
+    tester = Tester(
+        Client(host=("127.0.0.1", 9142), use_tls=False, debug_signal=Signals.SIGUSR1)
+    )
+    await tester.run_query("SELECT * FROM uprofile.user where user_id=?", (2,))
+    await tester.run_query("SELECT * FROM uprofile.user where user_id=:id", {"id": 3})
+    await tester.run_query("SELECT * FROM uprofile.user where user_id=:id", {"id": 45})
+    await tester.run_empty_prepare(
+        "INSERT INTO  uprofile.user  (user_id, user_name , user_bcity) VALUES (45, 'Trump', 'Washington D.C.')",
+        2,
+    )
+    await tester.run_query("SELECT * FROM uprofile.user where user_id=?", (45,))
+    await tester.run_simple_query("DELETE FROM uprofile.user where user_id=45")
+    await tester.close()
+
+
 async def test_dml2(tester):
     await tester.run_query("SELECT * FROM uprofile.user where user_id=?", (2,))
     await tester.run_query("SELECT * FROM uprofile.user where user_id=:id", {"id": 3})
@@ -184,6 +202,7 @@ async def run(command, stop=False):
         "dml",
         "full",
         "dupddl",
+        "ssl",
         "events",
         "use",
         "bad",
@@ -202,6 +221,8 @@ async def run(command, stop=False):
         await test_meta(tester)
     if command in ("bad",):
         await test_bad(tester)
+    if command in ("ssl",):
+        await test_tls(tester)
     if command in ("dml2",):
         await test_dml2(tester)
     if command in ("use",):
@@ -210,6 +231,7 @@ async def run(command, stop=False):
         await test_dupddl(tester)
     if command in ("events",):
         await test_events(tester)
+
     await tester.close()
 
 

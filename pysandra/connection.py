@@ -1,5 +1,5 @@
 import asyncio
-from typing import Callable, Dict, List, Optional
+from typing import Callable, Dict, List, Optional, Tuple
 
 from .constants import (
     CQL_VERSION,
@@ -21,26 +21,24 @@ logger = get_logger(__name__)
 class Connection:
     def __init__(
         self,
-        host: str = None,
-        port: int = None,
+        host: Tuple[str, int] = None,
+        use_tls: bool = False,
         options: Optional[Dict[str, str]] = None,
     ) -> None:
         self.protocol = V4Protocol()
         if options is None:
             options = {Options.CQL_VERSION: CQL_VERSION}
-        if host is None:
-            host = DEFAULT_HOST
-        if port is None:
-            port = DEFAULT_PORT
-        self.host = host
-        self.port = port
+
+        self.host = host[0] if host is not None else DEFAULT_HOST
+        self.port = host[1] if host is not None else DEFAULT_PORT
+        self.use_tls = use_tls
         self.preferred_algo = PREFERRED_ALGO
         self.is_ready = False
         self._in_startup = False
         self._options = options
         self._pkzip = PKZip()
         self.supported_options: Optional[Dict[str, List[str]]] = None
-        self._dispatcher = Dispatcher(self.protocol, self.host, self.port)
+        self._dispatcher = Dispatcher(self.protocol, self.host, self.port, self.use_tls)
 
     async def make_call(
         self, request_handler: Callable, response_handler: Callable, params: dict = None

@@ -8,7 +8,7 @@ def test_max_streams():
     with pytest.raises(
         MaximumStreamsException, match=r"too many streams last_id=31159 length=32769"
     ):
-        client = Dispatcher("blank", "", 0)
+        client = Dispatcher("blank", "", False, 0)
         move = 0
         while True:
             move += 1
