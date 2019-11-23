@@ -1,7 +1,19 @@
 import pytest
 
-from pysandra.core import SBytes, Streams
+from pysandra.core import SBytes, Streams, pretty_type
 from pysandra.exceptions import InternalDriverError, MaximumStreamsException
+
+
+def test_pretty_type_int():
+    assert pretty_type(1) == "int"
+
+
+def test_pretty_type_str():
+    assert pretty_type("1") == "str"
+
+
+def test_pretty_type_float():
+    assert pretty_type(1.2) == "<class 'float'>"
 
 
 def test_max_streams():

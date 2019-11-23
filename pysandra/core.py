@@ -1,8 +1,16 @@
-from typing import Dict, Generic, List, Optional, Type, TypeVar, cast
+from typing import Any, Dict, Generic, List, Optional, Type, TypeVar, cast
 
 from .exceptions import InternalDriverError, MaximumStreamsException
 
 # from .protocol import RequestMessage  # noqa: F401
+
+
+def pretty_type(value: Any) -> str:
+    if type(value) == str:
+        return "str"
+    elif type(value) == int:
+        return "int"
+    return str(type(value))
 
 
 class SBytes(bytes):

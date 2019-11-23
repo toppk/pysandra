@@ -165,3 +165,5 @@ What is the correct CQL_VERSION (sec. 4.1.1).  If you send options first, what p
 * extra data doesn't generate error messg
 
 * for fun try sending QueryFlags.VALUES with n ==0 both in execute and query
+
+* bad data in bind vs direct has differetn error strings

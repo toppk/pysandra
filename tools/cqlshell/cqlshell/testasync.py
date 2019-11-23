@@ -89,6 +89,7 @@ class Tester:
         print(f"========> FINISHED")
 
 
+# in suite
 async def test_use(tester):
     try:
         await tester.run_query("SELECT * FROM user where user_id=1")
@@ -99,6 +100,7 @@ async def test_use(tester):
     await tester.run_query("SELECT * FROM user where user_id=1")
 
 
+# in suite
 async def test_bad(tester):
     try:
         await tester.run_prepare(

@@ -17,7 +17,7 @@ from .constants import (
     ResultFlags,
     SchemaChangeTarget,
 )
-from .core import SBytes
+from .core import SBytes, pretty_type
 from .exceptions import (
     BadInputException,
     InternalDriverError,
@@ -544,9 +544,9 @@ class ResultMessage(ResponseMessage):
             rows_count = decode_int(body)
             for _cnt in range(rows_count * columns_count):
                 rows.add(decode_int_bytes(body))
-            msg = RowsResultMessage(
-                rows, kind, version, flags, stream_id, col_specs=col_specs
-            )
+            if col_specs is not None:
+                rows.col_specs = col_specs
+            msg = RowsResultMessage(rows, kind, version, flags, stream_id)
 
         elif kind == Kind.SET_KEYSPACE:
             keyspace = decode_string(body)
@@ -629,11 +629,8 @@ class SetKeyspaceResultMessage(ResultMessage):
 
 
 class RowsResultMessage(ResultMessage):
-    def __init__(
-        self, rows: "Rows", *args: Any, col_specs: Optional[List[Dict[str, Any]]] = None
-    ) -> None:
+    def __init__(self, rows: "Rows", *args: Any) -> None:
         self.rows: "Rows" = rows
-        self.col_specs: Optional[List[Dict[str, Any]]] = col_specs
         super().__init__(*args)
 
 
@@ -777,7 +774,7 @@ class QueryMessage(RequestMessage):
                     if spec["option_id"] == OptionID.INT:
                         if not isinstance(value, int):
                             raise BadInputException(
-                                f"expected int but got type={type(value)} for value={value!r}"
+                                f"expected type=int but got type={pretty_type(value)} for value={value!r}"
                             )
                         body += pack(
                             f"{NETWORK_ORDER}{STypes.INT}{STypes.INT}", 4, value
@@ -785,7 +782,7 @@ class QueryMessage(RequestMessage):
                     elif spec["option_id"] == OptionID.VARCHAR:
                         if not isinstance(value, str):
                             raise BadInputException(
-                                f"expected str but got type={type(value)} for value={value!r}"
+                                f"expected type=str but got type={pretty_type(value)} for value={value!r}"
                             )
                         body += encode_long_string(value)
                     else:

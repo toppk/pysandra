@@ -41,6 +41,7 @@ class Rows:
         self.index: int = 0
         self._data: List[Optional[bytes]] = []
         self.columns_count = columns_count
+        self.col_specs: Optional[List[Dict[str, Any]]] = None
 
     def __iter__(self) -> "Rows":
         return self

@@ -37,7 +37,6 @@ Things that exist:
 
 Things that don't exist:
 * any authnetication support
-* any ssl support
 * any connection support other then localhost :)
 * sync support (version 2.0)
 * full error handling
@@ -66,9 +65,9 @@ Aims to be:
 
 * get real data
 * paging
+* AUTH
 * Tests
 * make user objects user friendly (exceptions, EventChage, Rows)
-* AUTH
 * batch
 * client connection routing
 * cqlshell
