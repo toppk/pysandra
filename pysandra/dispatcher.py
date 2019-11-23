@@ -1,5 +1,4 @@
 import asyncio
-import ssl
 import sys
 import traceback
 from typing import Callable, Dict, Optional, Tuple, Union
@@ -16,18 +15,12 @@ logger = get_logger(__name__)
 
 class Dispatcher:
     def __init__(
-        self, protocol: "Protocol", host: str, port: int, use_tls: bool
+        self,
+        protocol: "Protocol",
+        reader: "asyncio.StreamReader",
+        writer: "asyncio.StreamWriter",
     ) -> None:
-        assert protocol is not None
         self._proto = protocol
-        self._tls: Optional["ssl.SSLContext"] = None
-        if use_tls:
-            context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
-            context.verify_mode = ssl.CERT_NONE
-            context.check_hostname = False
-            self._tls = context
-        self._host = host
-        self._port = port
         self._data: Dict[
             "asyncio.Event",
             Union["ExpectedResponses", "InternalDriverError", "ServerError"],
@@ -36,20 +29,16 @@ class Dispatcher:
             Tuple["RequestMessage", Callable, asyncio.Event]
         ] = Streams()
         self.decompress: Optional[Callable] = None
-        self._connected = False
+        self._connected = True
         self._running = False
-        self._writer: Optional["asyncio.StreamWriter"] = None
-        self._reader: Optional["asyncio.StreamReader"] = None
+        self._writer: "asyncio.StreamWriter" = writer
+        self._reader: "asyncio.StreamReader" = reader
         self._read_task: Optional["asyncio.Future"] = None
 
     async def send(
         self, request_handler: Callable, response_handler: Callable, params: dict = None
     ) -> "asyncio.Event":
-        if not self._connected:
-            await self._connect()
-
         stream_id = self._streams.create()
-        # should order compression
         request = request_handler(stream_id, params)
         event = asyncio.Event()
         self._streams.update(stream_id, (request, response_handler, event))
@@ -57,25 +46,17 @@ class Dispatcher:
         self._writer.write(bytes(request))
         return event
 
-    async def _receive(self) -> None:
-        assert self._reader is not None
-        try:
-            head = await self._reader.read(9)
-        except ConnectionResetError as e:
-            raise ConnectionDroppedError(e) from None
-        logger.debug(f"in _receive head={head!r}")
-        version, flags, stream_id, opcode, length = self._proto.decode_header(head)
-        body = await self._reader.read(length)
-        # should decompress
-        if flags & Flags.COMPRESSION:
-            logger.debug(f"body={body!r}")
-            assert self.decompress is not None
-            body = self.decompress(body)
-            logger.debug(f"body={body!r}")
+    def _process(
+        self,
+        version: int,
+        flags: int,
+        stream_id: int,
+        opcode: int,
+        length: int,
+        body: bytes,
+    ) -> None:
         if stream_id == EVENT_STREAM_ID:
-            await self._proto.event_handler(
-                version, flags, stream_id, opcode, length, body
-            )
+            self._proto.event_handler(version, flags, stream_id, opcode, length, body)
         else:
             request, response_handler, event = self._streams.remove(stream_id)
             # exceptions are stashed here (in the wrong task)
@@ -88,6 +69,18 @@ class Dispatcher:
             except InternalDriverError as e:
                 self._data[event] = e
             event.set()
+
+    async def _receive(self) -> Tuple[int, int, int, int, int, bytes]:
+        assert self._reader is not None
+        head = await self._reader.read(9)
+        version, flags, stream_id, opcode, length = self._proto.decode_header(head)
+        body = await self._reader.read(length)
+        if flags & Flags.COMPRESSION:
+            logger.debug(f"body={body!r}")
+            assert self.decompress is not None
+            body = self.decompress(body)
+            logger.debug(f"body={body!r}")
+        return version, flags, stream_id, opcode, length, body
 
     def retrieve(self, event: "asyncio.Event") -> "ExpectedResponses":
         try:
@@ -106,17 +99,17 @@ class Dispatcher:
         self._running = True
         try:
             while self._connected:
-                await self._receive()
-        except ConnectionDroppedError as e:
+                data = await self._receive()
+                self._process(*data)
+        except ConnectionResetError as e:
+            exp = ConnectionDroppedError(e)
             # logger.warning(f" connection dropped, going to close")
             self._running = False
             # close all requests
             for stream_id in self._streams.items():
                 _req, _resp_handler, event = self._streams.remove(stream_id)
-                self._data[event] = e
+                self._data[event] = exp
                 event.set()
-            self._reader = None
-            self._writer = None
         except asyncio.CancelledError as e:
             logger.debug(f"got canceled error running=[{self._running}] e=[{e}]")
             if self._running:
@@ -127,11 +120,7 @@ class Dispatcher:
             logger.warning(f"got baseeception")
             traceback.print_exc(file=sys.stdout)
 
-    async def _connect(self) -> None:
-        self._reader, self._writer = await asyncio.open_connection(
-            self._host, self._port, ssl=self._tls
-        )
-        self._connected = True
+    async def startup_listener(self) -> None:
         # avoid create_task for 3.6 compatability
         self._read_task = asyncio.ensure_future(self._listener())
 

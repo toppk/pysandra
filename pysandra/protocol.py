@@ -218,6 +218,9 @@ def decode_string_multimap(sbytes: "SBytes") -> Dict[str, List[str]]:
     return multimap
 
 
+# Header = namedtuple('Header', 'version flags stream_id opcode')
+
+
 class Protocol:
     version: int
     compress: Optional[Callable]
@@ -236,7 +239,7 @@ class Protocol:
             )
         return version, flags, stream, opcode, length
 
-    async def event_handler(
+    def event_handler(
         self,
         version: int,
         flags: int,

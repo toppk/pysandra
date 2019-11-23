@@ -7,7 +7,7 @@ from pysandra.exceptions import BadInputException, ServerError
 @pytest.mark.live_simple
 @pytest.mark.asyncio
 async def test_disconnected(client):
-    assert not client.is_connected()
+    assert not client.is_connected
 
 
 @pytest.mark.live
@@ -15,7 +15,7 @@ async def test_disconnected(client):
 @pytest.mark.asyncio
 async def test_connected(client):
     await client.connect()
-    assert client.is_connected()
+    assert client.is_connected
 
 
 @pytest.mark.live

@@ -1,8 +1,9 @@
 import asyncio
+import signal
 from collections.abc import Iterable
 from os import getpid
-from signal import Signals
-from typing import Any, Callable, List, Optional, Tuple
+from types import FrameType  # noqa: F401
+from typing import Any, Callable, List, Optional, Tuple, Union
 
 from .connection import Connection
 from .constants import REQUEST_TIMEOUT, STARTUP_TIMEOUT, Events  # noqa: F401
@@ -27,35 +28,41 @@ class Client:
         self,
         host: Optional[Tuple[str, int]] = None,
         use_tls: bool = False,
-        debug_signal: Optional["Signals"] = None,
+        debug_signal: Optional["signal.Signals"] = None,
     ) -> None:
         # this protocol will never be used, just placating mypy
-        self._proto: "Protocol" = Protocol()
         self._conn = Connection(host=host, use_tls=use_tls)
-        self._is_ready = False
         self._in_startup = False
         self._is_ready_event = asyncio.Event()
         if debug_signal is not None:
             self._install_signal(debug_signal)
 
-    def _dump_state(self) -> None:
-        logger.debug("in signal handler")
+    def _dump_state(self, signum: int, frame: Optional["FrameType"]) -> None:
+        logger.warning(f"Dumping Internal State signal={signum} and frame={frame}")
 
-    def _install_signal(self, debug_signal: "Signals") -> None:
-        if isinstance(debug_signal, Signals):
-            signal = debug_signal
-        elif isinstance(signal, str):
+    def _install_signal(self, debug_signal: Union["signal.Signals", str, int]) -> None:
+        debug_signal = debug_signal
+        if isinstance(debug_signal, int):
             try:
-                signal = Signals(debug_signal)
+                debug_signal = signal.Signals(debug_signal)
             except ValueError:
                 raise TypeViolation(
-                    f"signal={debug_signal} is not valid.  Please use signal.SIG*"
+                    f"debug signal is not valid signal={debug_signal}.  Please use signal.SIG*"
+                )
+        elif isinstance(debug_signal, str):
+            try:
+                debug_signal = signal.Signals[debug_signal]
+            except KeyError:
+                raise TypeViolation(
+                    f"debug signal is not valid signal={debug_signal}.  Please use signal.SIG*"
                 )
 
-        loop = asyncio.get_event_loop()
         logger.debug(f" adding debug handler at signal={signal!r} for pid={getpid()}")
-        loop.add_signal_handler(signal, self._dump_state)
+        signal.signal(debug_signal, self._dump_state)
+        # loop = asyncio.get_event_loop()
+        # loop.add_signal_handler(signal, self._dump_state)
 
+    @property
     def is_connected(self) -> bool:
         return self._conn.is_ready
 
@@ -63,8 +70,6 @@ class Client:
         if not self._conn.is_ready:
             if await self._conn.startup():
                 self._is_ready_event.set()
-                # install the real protocol
-                self._proto = self._conn.protocol
             else:
                 try:
                     await asyncio.wait_for(
@@ -72,7 +77,6 @@ class Client:
                     )
                 except asyncio.TimeoutError as e:
                     raise StartupTimeout(e) from None
-        assert self._proto is not None
 
     async def close(self) -> None:
         await self._conn.close()
@@ -80,7 +84,9 @@ class Client:
     @online
     async def register(self, events: List["Events"]) -> "asyncio.Queue":
         resp = await self._conn.make_call(
-            self._proto.register, self._proto.build_response, params={"events": events}
+            self._conn.protocol.register,
+            self._conn.protocol.build_response,
+            params={"events": events},
         )
 
         assert isinstance(resp, asyncio.Queue)
@@ -94,8 +100,8 @@ class Client:
         if isinstance(stmt, str):
             # query
             return await self._conn.make_call(
-                self._proto.query,
-                self._proto.build_response,
+                self._conn.protocol.query,
+                self._conn.protocol.build_response,
                 params={
                     "query": stmt,
                     "query_params": args,
@@ -105,8 +111,8 @@ class Client:
         else:
             # execute (prepared statements)
             return await self._conn.make_call(
-                self._proto.execute,
-                self._proto.build_response,
+                self._conn.protocol.execute,
+                self._conn.protocol.build_response,
                 params={
                     "statement_id": stmt,
                     "query_params": args,
@@ -117,7 +123,9 @@ class Client:
     @online
     async def prepare(self, stmt: str) -> bytes:
         resp = await self._conn.make_call(
-            self._proto.prepare, self._proto.build_response, params={"query": stmt}
+            self._conn.protocol.prepare,
+            self._conn.protocol.build_response,
+            params={"query": stmt},
         )
         assert isinstance(resp, bytes)
         return resp

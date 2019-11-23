@@ -1,4 +1,5 @@
 import asyncio
+import ssl
 from typing import Callable, Dict, List, Optional, Tuple
 
 from .constants import (
@@ -31,19 +32,32 @@ class Connection:
 
         self.host = host[0] if host is not None else DEFAULT_HOST
         self.port = host[1] if host is not None else DEFAULT_PORT
-        self.use_tls = use_tls
+        self.tls: Optional["ssl.SSLContext"] = None
+        if use_tls:
+            context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
+            context.verify_mode = ssl.CERT_NONE
+            context.check_hostname = False
+            self.tls = context
         self.preferred_algo = PREFERRED_ALGO
         self.is_ready = False
         self._in_startup = False
         self._options = options
         self._pkzip = PKZip()
         self.supported_options: Optional[Dict[str, List[str]]] = None
-        self._dispatcher = Dispatcher(self.protocol, self.host, self.port, self.use_tls)
+        self._dispatcher: Optional["Dispatcher"] = None
+
+    @property
+    def is_connected(self) -> bool:
+        # TODO: fix this
+        if self._dispatcher is not None:
+            return self._dispatcher._connected
+        return False
 
     async def make_call(
         self, request_handler: Callable, response_handler: Callable, params: dict = None
     ) -> "ExpectedResponses":
         logger.debug(f" sending {request_handler}")
+        assert self._dispatcher is not None
         event = await self._dispatcher.send(
             request_handler, response_handler, params=params
         )
@@ -57,6 +71,11 @@ class Connection:
         if self._in_startup:
             return False
         self._in_startup = True
+        reader, writer = await asyncio.open_connection(
+            self.host, self.port, ssl=self.tls
+        )
+        self._dispatcher = Dispatcher(self.protocol, reader, writer)
+        await self._dispatcher.startup_listener()
         supported_options = await self.make_call(
             self.protocol.options, self.protocol.build_response
         )
@@ -78,6 +97,7 @@ class Connection:
         return is_ready
 
     async def close(self) -> None:
+        assert self._dispatcher is not None
         await self._dispatcher.close()
 
     def decompress(self, data: bytes) -> bytes:

@@ -1,7 +1,7 @@
-from asyncio import Queue
+from asyncio import Queue, QueueFull
 from typing import Callable, Dict, Optional
 
-from .constants import Opcode
+from .constants import EVENTS_QUEUE_MAXSIZE, Opcode
 from .core import SBytes
 from .exceptions import ServerError  # noqa: F401
 from .exceptions import InternalDriverError, UnknownPayloadException
@@ -101,7 +101,7 @@ class V4Protocol(Protocol):
             compress=self.compress,
         )
 
-    async def event_handler(
+    def event_handler(
         self,
         version: int,
         flags: int,
@@ -118,7 +118,10 @@ class V4Protocol(Protocol):
             raise InternalDriverError(
                 f"still data left remains={sbytes_body.remaining!r}"
             )
-        await self._events.put(msg.event)
+        try:
+            self._events.put_nowait(msg.event)
+        except QueueFull:
+            raise InternalDriverError(f"event queue is full, droppping event")
 
     def build_response(
         self,
@@ -196,7 +199,7 @@ class V4Protocol(Protocol):
         elif request.opcode == Opcode.REGISTER:
             if response.opcode == Opcode.READY:
                 if self._events is None:
-                    self._events = Queue()
+                    self._events = Queue(maxsize=EVENTS_QUEUE_MAXSIZE)
                 return self._events
         elif request.opcode == Opcode.PREPARE:
             if response.opcode == Opcode.RESULT:

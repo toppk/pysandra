@@ -3,6 +3,9 @@ from enum import Enum
 
 # driver
 
+# max event queue size
+EVENTS_QUEUE_MAXSIZE = 100
+
 # in bytes
 COMPRESS_MINIMUM = 60
 

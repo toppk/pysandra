@@ -35,7 +35,7 @@ def run_loop(func):
 
 async def setup_db(client=None, close=False):
     # should make sure database has test data
-    if client is None or not client.is_connected():
+    if client is None or not client.is_connected:
         client = Client()
     await client.execute("DROP TABLE IF EXISTS uprofile.user")
     await client.execute("DROP KEYSPACE IF EXISTS uprofile")
@@ -53,7 +53,7 @@ async def setup_db(client=None, close=False):
     await client.execute(insert_data, [3, "Keviv", "Chennai"])
     await client.execute(insert_data, [4, "Ehtevs", "Pune"])
     await client.execute(insert_data, [5, "Dnivog", "Belgaum"])
-    print(f"in setup_db client={client.is_connected()}")
+    print(f"in setup_db client={client.is_connected}")
     if close:
         await client.close()
 
@@ -71,5 +71,5 @@ async def client():
     yield c
     if c.reset:
         await c.reset_now()
-    if c.is_connected():
+    if c.is_connected:
         await c.close()
