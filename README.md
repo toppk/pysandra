@@ -1,20 +1,14 @@
 ## NOTICE
 
-This project has just started.
+This project has just started.  In order to get the SDLC complete, this project is published on github and pypi, but I don't recommend anyone use it just yet.
 
-In order to get the SDLC complete, this project is published on github and pypi.
-
-This is only recommened for people who want
+However, it is for anyone who wants
 
 * to get involved in development,
-* give feedback
-* are happy with it's very limited state
+* to give feedback,
+* or are happy with it's very limited state
 
-Please check back often, I hope to get this to a generally useful state this year.
-
-Contributions, advice welcome, development coodinated on github
-
-
+Please check back often, I hope to get this to a generally useful state this year.  Contributions, advice welcome, development is coodinated on github.
 
 <p align="center">
   <a href="https://pysandra.readthedocs.org/"><img width="350" height="208" src="https://raw.githubusercontent.com/toppk/pysandra/master/docs/img/logo.png" alt='pysandra'></a>
@@ -76,15 +70,8 @@ Aims to be:
 * make user objects user friendly (exceptions, EventChage, Rows)
 * AUTH
 * batch
+* client connection routing
 * cqlshell
-
-## Developing
-
-$ cd pysandra
-$ python3 -m venv venv
-$ source venv/bin/activate
-$ pip install -r test-requirements.txt
-$ pip install -e .
 
 
 ## License & Contributions

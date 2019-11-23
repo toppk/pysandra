@@ -144,7 +144,7 @@ async def test_tls(tester):
     await tester.close()
     # tester = Tester(Client(host=("127.0.0.1", 9042), use_tls=False, debug_signal=Signals.SIGUSR1))
     tester = Tester(
-        Client(host=("127.0.0.1", 9142), use_tls=False, debug_signal=Signals.SIGUSR1)
+        Client(host=("127.0.0.1", 9142), use_tls=True, debug_signal=Signals.SIGUSR1)
     )
     await tester.run_query("SELECT * FROM uprofile.user where user_id=?", (2,))
     await tester.run_query("SELECT * FROM uprofile.user where user_id=:id", {"id": 3})

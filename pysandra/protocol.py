@@ -138,12 +138,14 @@ def encode_string(value: Union[str, bytes]) -> bytes:
     )
 
 
-def encode_value(value: Union[str, bytes, int]) -> bytes:
+def encode_value(value: Optional[Union[str, bytes, int]]) -> bytes:
+    if value is None:
+        return encode_int(-1)
     if isinstance(value, int):
         value_bytes = encode_int(value)
     elif isinstance(value, str):
         value_bytes = value.encode("utf-8")
-    elif isinstance(value, dict):
+    elif isinstance(value, bytes):
         value_bytes = value
     return encode_int(len(value_bytes)) + pack(
         f"{NETWORK_ORDER}{len(value_bytes)}{STypes.CHAR}", value_bytes
