@@ -1,5 +1,6 @@
 import pytest
 
+from pysandra import Events
 from pysandra.exceptions import BadInputException, ServerError
 
 
@@ -194,3 +195,15 @@ async def test_meta_prepared(client):
     data = [45, "Trump", "Washington D.C."]
     resp = await client.execute(stmt_id, data, send_metadata=True)
     assert resp.col_specs is None
+
+
+@pytest.mark.live
+@pytest.mark.live_simple
+@pytest.mark.asyncio
+async def test_meta_schema_events(client):
+    queue = await client.register([Events.SCHEMA_CHANGE])
+    query = "CREATE KEYSPACE IF NOT EXISTS testkeyspace WITH replication = {'class': 'NetworkTopologyStrategy', 'datacenter1' : '1' }"
+    await client.execute(query)
+    query = "DROP KEYSPACE testkeyspace"
+    await client.execute(query)
+    assert queue.get_nowait().options["target_name"] == "testkeyspace"

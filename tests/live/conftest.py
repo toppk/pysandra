@@ -39,6 +39,7 @@ async def setup_db(client=None, close=False):
         client = Client()
     await client.execute("DROP TABLE IF EXISTS uprofile.user")
     await client.execute("DROP KEYSPACE IF EXISTS uprofile")
+    await client.execute("DROP KEYSPACE IF EXISTS testkeyspace")
     await client.execute(
         "CREATE KEYSPACE uprofile WITH replication = {'class': 'NetworkTopologyStrategy', 'datacenter1' : '1' }"
     )

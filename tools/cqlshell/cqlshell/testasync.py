@@ -181,6 +181,7 @@ async def test_ddl(tester):
     )
 
 
+# in suite
 async def test_events(tester):
     await tester.run_register([Events.SCHEMA_CHANGE])
 

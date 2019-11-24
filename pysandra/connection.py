@@ -1,5 +1,7 @@
 import asyncio
 import ssl
+import sys
+import traceback
 from typing import Callable, Dict, List, Optional, Tuple
 
 from .constants import (
@@ -11,7 +13,7 @@ from .constants import (
     Options,
 )
 from .dispatcher import Dispatcher
-from .exceptions import InternalDriverError, RequestTimeout
+from .exceptions import ConnectionDroppedError, InternalDriverError, RequestTimeout
 from .types import ExpectedResponses  # noqa: F401
 from .utils import PKZip, get_logger
 from .v4protocol import V4Protocol
@@ -39,8 +41,9 @@ class Connection:
             context.check_hostname = False
             self.tls = context
         self.preferred_algo = PREFERRED_ALGO
-        self.is_ready = False
+        self._is_ready = False
         self._in_startup = False
+        self._is_connected = False
         self._options = options
         self._pkzip = PKZip()
         self.supported_options: Optional[Dict[str, List[str]]] = None
@@ -48,10 +51,11 @@ class Connection:
 
     @property
     def is_connected(self) -> bool:
-        # TODO: fix this
-        if self._dispatcher is not None:
-            return self._dispatcher._connected
-        return False
+        return self._is_connected
+
+    @property
+    def is_ready(self) -> bool:
+        return self._is_ready
 
     async def make_call(
         self, request_handler: Callable, response_handler: Callable, params: dict = None
@@ -67,6 +71,25 @@ class Connection:
             raise RequestTimeout(e) from None
         return self._dispatcher.retrieve(event)
 
+    # should return typing.NoReturn
+    async def _listener(self) -> None:
+        assert self._dispatcher is not None
+        try:
+            while True:
+                await self._dispatcher.cycle()
+        except ConnectionResetError as e:
+            exp = ConnectionDroppedError(e)
+            logger.warning(f" connection dropped, going to close")
+            self._dispatcher.end_all(exp)
+        except asyncio.CancelledError as e:
+            logger.debug(f"got canceled error  e=[{e}]")
+            await self.close(True)
+            # raise (e)
+        # do I know what I'm doing?
+        except BaseException:
+            logger.warning(f"got baseeception")
+            traceback.print_exc(file=sys.stdout)
+
     async def startup(self) -> bool:
         if self._in_startup:
             return False
@@ -74,8 +97,10 @@ class Connection:
         reader, writer = await asyncio.open_connection(
             self.host, self.port, ssl=self.tls
         )
+        self._connected = True
         self._dispatcher = Dispatcher(self.protocol, reader, writer)
-        await self._dispatcher.startup_listener()
+        # avoid create_task for 3.6 compatability
+        self._read_task = asyncio.ensure_future(self._listener())
         supported_options = await self.make_call(
             self.protocol.options, self.protocol.build_response
         )
@@ -92,13 +117,15 @@ class Connection:
             self.protocol.startup, self.protocol.build_response, params=params
         )
         assert isinstance(is_ready, bool) and is_ready
-        self.is_ready = is_ready
+        self._is_ready = is_ready
         logger.debug(f"startup is_ready={is_ready}")
         return is_ready
 
-    async def close(self) -> None:
+    async def close(self, from_listener: bool = False) -> None:
         assert self._dispatcher is not None
         await self._dispatcher.close()
+        if self._read_task is not None and not from_listener:
+            self._read_task.cancel()
 
     def decompress(self, data: bytes) -> bytes:
         if "COMPRESSION" not in self._options:

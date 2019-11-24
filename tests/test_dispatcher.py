@@ -5,7 +5,6 @@ import pytest
 
 from pysandra.core import SBytes
 from pysandra.dispatcher import Dispatcher
-from pysandra.protocol import Protocol
 
 
 def get_mock_coro(return_value):
@@ -32,12 +31,10 @@ async def test_dispatcher_send():
 @pytest.mark.asyncio
 async def test_dispatcher_receive():
     mock_reader = Mock(spec=asyncio.StreamReader)
-    mock_proto = Mock(spec=Protocol)
-    d = Dispatcher(mock_proto, mock_reader, None)
+    d = Dispatcher(None, mock_reader, None)
     d._reader = mock_reader
     stream = SBytes(b"\x85\x00\x00\x00\x00\x02\x01\x00\x02\xaa\xbb")
     mock_reader.read = get_mock_coro(lambda x: stream.grab(x))
     # mock_reader.returns = b'\01\84\00\00\08\00'
-    mock_proto.decode_header.return_value = [1, 2, 0, 2, 2]
-    data = await d._receive()
+    data = await d._receive(lambda x: [1, 2, 0, 2, 2])
     assert data[5] == b"\xaa\xbb"
