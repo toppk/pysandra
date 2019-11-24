@@ -94,10 +94,8 @@ def test_protocol_messages_requestmessage_basic():
     assert bytes(msg) == b"\x01\x02\x00\x03\x01\x00\x00\x00\x00"
 
 
-def test_protocol_messages_requestmessage_compress():
-    old = protocol.COMPRESS_MINIMUM
-    protocol.COMPRESS_MINIMUM = 20
-
+def test_protocol_messages_requestmessage_compress(monkeypatch):
+    monkeypatch.setattr(protocol, "COMPRESS_MINIMUM", 20)
     msg = protocol.RequestMessage(1, 2, 3, lambda x: x[1:20])
 
     def encode_body(*args):
@@ -106,7 +104,6 @@ def test_protocol_messages_requestmessage_compress():
     msg.encode_body = encode_body
     msg.opcode = 1
     assert bytes(msg) == b"\x01\x03\x00\x03\x01\x00\x00\x00\x13ow row row your boa"
-    protocol.COMPRESS_MINIMUM = old
 
 
 def test_protocol_messages_responsemessage_basic():
