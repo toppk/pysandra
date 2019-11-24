@@ -235,7 +235,7 @@ class Protocol:
         expected_version = SERVER_SENT | self.version
         if version != expected_version:
             raise VersionMismatchException(
-                f"received version={version:x} instead of expected_version={expected_version}"
+                f"received incorrect version from server, go version=0x{version:x} expected version=0x{expected_version:x}"
             )
         return version, flags, stream, opcode, length
 
@@ -298,7 +298,7 @@ class RequestMessage(BaseMessage):
 
     def __bytes__(self) -> bytes:
         body: bytes = self.encode_body()
-        if self.compress is not None and len(body) > COMPRESS_MINIMUM:
+        if self.compress is not None and len(body) >= COMPRESS_MINIMUM:
             self.flags |= Flags.COMPRESSION
             logger.debug("compressing the request")
             body = self.compress(body)
