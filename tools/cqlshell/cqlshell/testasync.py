@@ -5,9 +5,8 @@ import asyncio
 import sys
 from signal import Signals
 
-from pysandra import Client, Events, exceptions
-from pysandra.types import Rows, SchemaChange
-from pysandra.utils import enable_debug
+import pysandra
+from pysandra.utils import set_debug
 
 
 class Tester:
@@ -34,10 +33,10 @@ class Tester:
     async def run_simple_query(self, query, send_metadata=False):
         print(f"========> RUNNING {query}")
         resp = await self.client.execute(query, send_metadata=send_metadata)
-        if isinstance(resp, Rows):
+        if isinstance(resp, pysandra.Rows):
             for row in resp:
                 print(f"got row={row}")
-        elif isinstance(resp, SchemaChange):
+        elif isinstance(resp, pysandra.SchemaChange):
             print(f">>> got schema_change={resp}")
         elif isinstance(resp, bool):
             print(f">>> got status={resp}")
@@ -50,10 +49,10 @@ class Tester:
     async def run_query(self, query, args=None, send_metadata=False):
         print(f"========> RUNNING {query} args={args}")
         resp = await self.client.execute(query, args, send_metadata=send_metadata)
-        if isinstance(resp, Rows):
+        if isinstance(resp, pysandra.Rows):
             for row in resp:
                 print(f"got row={row}")
-        elif isinstance(resp, SchemaChange):
+        elif isinstance(resp, pysandra.SchemaChange):
             print(f">>> got schema_change={resp}")
         elif isinstance(resp, bool):
             print(f">>> got status={resp}")
@@ -63,13 +62,16 @@ class Tester:
             raise ValueError(f"unexpected response={resp}")
         print(f"========> FINISHED")
 
-    async def run_prepare(self, query, data, send_metadata=False):
+    async def run_prepare(self, query, data, send_metadata=False, consistency=None):
         print(f"========> PREPARING {query}")
         statement_id = await self.client.prepare(query)
         for entry in data:
             print(f"========> EXECUTING {entry}")
             resp = await self.client.execute(
-                statement_id, entry, send_metadata=send_metadata
+                statement_id,
+                entry,
+                send_metadata=send_metadata,
+                consistency=consistency,
             )
             if isinstance(resp, bool):
                 print(f">>> got status={resp}")
@@ -94,7 +96,7 @@ class Tester:
 async def test_use(tester):
     try:
         await tester.run_query("SELECT * FROM user where user_id=1")
-    except exceptions.ServerError as e:
+    except pysandra.ServerError as e:
         print(f">>> got ServerError exception={e.msg.error_text}")
         print(f"========> FINISHED")
     await tester.run_query("use uprofile")
@@ -108,14 +110,14 @@ async def test_bad(tester):
             "INSERT INTO  uprofile.user  (user_id, user_name , user_bcity) VALUES (?,?,?)",
             [["hillary", 2, "Washington D.C."]],
         )
-    except exceptions.BadInputException as e:
+    except pysandra.BadInputException as e:
         print(f">>> got BadInputException exception={e}")
         print(f"========> FINISHED")
     try:
         await tester.run_query(
             "INSERT INTO  uprofile.user (user_id, user_name , user_bcity) VALUES ('hillary', 2, 'DC')"
         )
-    except exceptions.ServerError as e:
+    except pysandra.ServerError as e:
         print(f">>> got ServerError exception={e}")
         print(f"========> FINISHED")
 
@@ -147,7 +149,9 @@ async def test_tls(tester):
     await tester.close()
     # tester = Tester(Client(host=("127.0.0.1", 9042), use_tls=False, debug_signal=Signals.SIGUSR1))
     tester = Tester(
-        Client(host=("127.0.0.1", 9142), use_tls=True, debug_signal=Signals.SIGUSR1)
+        pysandra.Client(
+            host=("127.0.0.1", 9142), use_tls=True, debug_signal=Signals.SIGUSR1
+        )
     )
     await tester.run_query("SELECT * FROM uprofile.user where user_id=?", (2,))
     await tester.run_query("SELECT * FROM uprofile.user where user_id=:id", {"id": 3})
@@ -159,6 +163,14 @@ async def test_tls(tester):
     await tester.run_query("SELECT * FROM uprofile.user where user_id=?", (45,))
     await tester.run_simple_query("DELETE FROM uprofile.user where user_id=45")
     await tester.close()
+
+
+async def test_error(tester):
+    await tester.run_prepare(
+        "INSERT INTO  uprofile.user  (user_id, user_name , user_bcity) VALUES (:id,:n,:c)",
+        [[45, "Trump", "Washington D.C."]],
+        consistency=pysandra.Consistency.THREE,
+    )
 
 
 async def test_dml2(tester):
@@ -184,7 +196,7 @@ async def test_ddl(tester):
 
 # in suite
 async def test_events(tester):
-    await tester.run_register([Events.SCHEMA_CHANGE])
+    await tester.run_register([pysandra.Events.SCHEMA_CHANGE])
 
 
 async def test_dupddl(tester):
@@ -195,7 +207,7 @@ async def test_dupddl(tester):
         await tester.run_query(
             "CREATE KEYSPACE testkeyspace WITH replication = {'class': 'NetworkTopologyStrategy', 'datacenter1' : '1' }"
         )
-    except exceptions.ServerError as e:
+    except pysandra.ServerError as e:
         print(f">>> got ServerError exception={e.msg.details}")
     await tester.run_query("DROP KEYSPACE testkeyspace")
 
@@ -203,6 +215,7 @@ async def test_dupddl(tester):
 async def run(command, stop=False):
     if command not in (
         "ddl",
+        "error",
         "dml",
         "full",
         "dupddl",
@@ -215,7 +228,7 @@ async def run(command, stop=False):
     ):
         print(f"ERROR:unknown command={command}")
         sys.exit(1)
-    tester = Tester(Client(debug_signal=Signals.SIGUSR1))
+    tester = Tester(pysandra.Client(debug_signal=Signals.SIGUSR1))
     await tester.connect()
     if command in ("ddl", "full",):
         await test_ddl(tester)
@@ -231,6 +244,8 @@ async def run(command, stop=False):
         await test_dml2(tester)
     if command in ("use",):
         await test_use(tester)
+    if command in ("error",):
+        await test_error(tester)
     if command in ("dupddl",):
         await test_dupddl(tester)
     if command in ("events",):
@@ -248,7 +263,7 @@ def main():
     parser.set_defaults(stop=False)
     args = parser.parse_args()
     if args.debug:
-        enable_debug()
+        set_debug(True)
     asyncio.run(run(args.command, args.stop))
     print("finished")
 

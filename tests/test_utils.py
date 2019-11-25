@@ -3,7 +3,7 @@ import os
 import pytest
 
 from pysandra.exceptions import InternalDriverError
-from pysandra.utils import PKZip, fetch_module, get_logger
+from pysandra.utils import PKZip, fetch_module, get_logger, set_debug
 
 
 @pytest.fixture
@@ -77,7 +77,7 @@ def test_pkzip_bad_algo_dec(pkzip):
         pkzip.decompress(data, "foo")
 
 
-def test_logging_debugoff(caplog):
+def test_logging_debugnver(caplog):
     logger = get_logger("pysandra.pytest_")
     string = "this is a long string!"
     logger.debug(string)
@@ -93,6 +93,19 @@ def test_logging_debugon(caplog):
     string = "this is a long string!"
     logger.debug(string)
     assert string in caplog.text
+    set_debug(False)
+
+
+def test_logging_debugoff(caplog):
+    import pysandra.utils
+
+    pysandra.utils._LOGGER_INITIALIZED = False
+    os.environ["PYSANDRA_LOG_LEVEL"] = "DEBUG"
+    logger = get_logger("pysandra.pytest_")
+    string = "this is a long string!"
+    set_debug(False)
+    logger.debug(string)
+    assert string not in caplog.text
 
 
 def test_logging_warning(caplog):

@@ -2,7 +2,7 @@ import asyncio
 import ssl
 import sys
 import traceback
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from .constants import (
     CQL_VERSION,
@@ -58,7 +58,10 @@ class Connection:
         return self._is_ready
 
     async def make_call(
-        self, request_handler: Callable, response_handler: Callable, params: dict = None
+        self,
+        request_handler: Callable,
+        response_handler: Callable,
+        params: Dict[str, Any] = None,
     ) -> "ExpectedResponses":
         logger.debug(f" sending {request_handler}")
         assert self._dispatcher is not None
@@ -81,8 +84,8 @@ class Connection:
             exp = ConnectionDroppedError(e)
             logger.warning(f" connection dropped, going to close")
             self._dispatcher.end_all(exp)
-        except asyncio.CancelledError as e:
-            logger.debug(f"got canceled error  e=[{e}]")
+        except asyncio.CancelledError:
+            logger.debug(f"got CanceledError")
             await self.close(True)
             # raise (e)
         # do I know what I'm doing?

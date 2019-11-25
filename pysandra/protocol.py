@@ -6,7 +6,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
 from .constants import (
     COMPRESS_MINIMUM,
     SERVER_SENT,
-    Consitency,
+    Consistency,
     ErrorCode,
     Events,
     Flags,
@@ -336,7 +336,9 @@ class ResponseMessage(BaseMessage):
         logger.debug(f"creating msg class={cls} with body={body!r}")
         msg = cls.build(version, flags, stream_id, body)
         if not body.at_end():
-            raise InternalDriverError(f"still data left remains={body.remaining!r}")
+            raise InternalDriverError(
+                f"class={cls}.build() left data remains={body.remaining!r}"
+            )
         if msg is None:
             raise InternalDriverError(
                 f"didn't generate a response message for opcode={cls.opcode}"
@@ -401,7 +403,10 @@ class ErrorMessage(ResponseMessage):
             raise InternalDriverError(f"unknown error code={code}")
         error_text = decode_string(body)
         if error_code == ErrorCode.UNAVAILABLE_EXCEPTION:
-            pass
+            #                 <cl><required><alive>
+            details["consistency_level"] = decode_short(body)
+            details["required"] = decode_int(body)
+            details["alive"] = decode_int(body)
         elif error_code == ErrorCode.WRITE_TIMEOUT:
             pass
         elif error_code == ErrorCode.READ_TIMEOUT:
@@ -718,8 +723,10 @@ class ExecuteMessage(RequestMessage):
         send_metadata: bool,
         col_specs: List[dict],
         *args: Any,
+        consistency: "Consistency" = None,
         **kwargs: Any,
     ) -> None:
+        self.consistency = consistency
         self.query_id = query_id
         if query_params is None:
             query_params = []
@@ -739,7 +746,10 @@ class ExecuteMessage(RequestMessage):
                 f" count of execute params={len(self.query_params)} doesn't match prepared statement count={len(self.col_specs)}"
             )
         body += QueryMessage.encode_query_parameters(
-            self.query_params, self.send_metadata, col_specs=self.col_specs
+            self.query_params,
+            self.send_metadata,
+            col_specs=self.col_specs,
+            consistency=self.consistency,
         )
 
         #     [<n>[name_1]<value_1>...[name_n]<value_n>][<result_page_size>][<paging_state>][<serial_consistency>][<timestamp>]
@@ -756,8 +766,10 @@ class QueryMessage(RequestMessage):
         query_params: Optional["Collection"],
         send_metadata: bool,
         *args: Any,
+        consistency: "Consistency" = None,
         **kwargs: Any,
     ) -> None:
+        self.consistency = consistency
         self.query = query
         if query_params is None:
             query_params = []
@@ -771,7 +783,10 @@ class QueryMessage(RequestMessage):
         query_params: "Collection",
         send_metadata: bool,
         col_specs: Optional[List[dict]] = None,
+        consistency: "Consistency" = None,
     ) -> bytes:
+        if consistency is None:
+            consistency = Consistency.ONE
 
         body: bytes = b""
         #   <consistency><flags>[<n>[name_1]<value_1>...[name_n]<value_n>][<result_page_size>][<paging_state>][<serial_consistency>][<timestamp>][<keyspace>][<now_in_seconds>]
@@ -783,7 +798,7 @@ class QueryMessage(RequestMessage):
         if not send_metadata:
             flags |= QueryFlags.SKIP_METADATA
         body += get_struct(f"{NETWORK_ORDER}{STypes.USHORT}{STypes.BYTE}").pack(
-            Consitency.ONE, flags
+            consistency, flags
         )
         if len(query_params) > 0:
             body += encode_short(len(query_params))
@@ -829,7 +844,7 @@ class QueryMessage(RequestMessage):
     def encode_body(self) -> bytes:
         body = encode_long_string(self.query)
         body += QueryMessage.encode_query_parameters(
-            self.query_params, self.send_metadata
+            self.query_params, self.send_metadata, consistency=self.consistency
         )
         return body
 

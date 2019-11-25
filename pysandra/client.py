@@ -3,10 +3,15 @@ import signal
 from collections.abc import Iterable
 from os import getpid
 from types import FrameType  # noqa: F401
-from typing import Any, Callable, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 from .connection import Connection
-from .constants import REQUEST_TIMEOUT, STARTUP_TIMEOUT, Events  # noqa: F401
+from .constants import (  # noqa: F401
+    REQUEST_TIMEOUT,
+    STARTUP_TIMEOUT,
+    Consistency,
+    Events,
+)
 from .exceptions import StartupTimeout, TypeViolation
 from .protocol import Protocol  # noqa: F401
 from .types import ExpectedResponses  # noqa: F401
@@ -94,30 +99,40 @@ class Client:
 
     @online
     async def execute(
-        self, stmt: str, args: Optional[Iterable] = None, send_metadata: bool = False
+        self,
+        stmt: str,
+        args: Optional[Iterable] = None,
+        send_metadata: bool = False,
+        consistency: "Consistency" = None,
     ) -> "ExpectedResponses":
         logger.debug(f" in execte got args={args}")
         if isinstance(stmt, str):
             # query
+            params: Dict[str, Any] = {
+                "query": stmt,
+                "query_params": args,
+                "send_metadata": send_metadata,
+            }
+            if consistency is not None:
+                params["consistency"] = consistency
             return await self._conn.make_call(
                 self._conn.protocol.query,
                 self._conn.protocol.build_response,
-                params={
-                    "query": stmt,
-                    "query_params": args,
-                    "send_metadata": send_metadata,
-                },
+                params=params,
             )
         else:
             # execute (prepared statements)
+            params = {
+                "statement_id": stmt,
+                "query_params": args,
+                "send_metadata": send_metadata,
+            }
+            if consistency is not None:
+                params["consistency"] = consistency
             return await self._conn.make_call(
                 self._conn.protocol.execute,
                 self._conn.protocol.build_response,
-                params={
-                    "statement_id": stmt,
-                    "query_params": args,
-                    "send_metadata": send_metadata,
-                },
+                params=params,
             )
 
     @online

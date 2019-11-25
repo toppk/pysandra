@@ -143,6 +143,12 @@ def test_protocol_messages_errormsg_build():
     assert msg.error_code == constants.ErrorCode.INVALID
 
 
+def test_protocol_messages_errormsg_build_unavailable():
+    body = b"\x00\x00\x10\x00\x00&Cannot achieve consistency level THREE\x00\x03\x00\x00\x00\x03\x00\x00\x00\x01"
+    msg = protocol.ErrorMessage.build(1, 2, 3, SBytes(body),)
+    assert msg.error_code == constants.ErrorCode.UNAVAILABLE_EXCEPTION
+
+
 def test_protocol_messages_event_build():
     pass
 

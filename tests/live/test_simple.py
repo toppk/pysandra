@@ -1,7 +1,6 @@
 import pytest
 
-from pysandra import Events
-from pysandra.exceptions import BadInputException, ServerError
+from pysandra import BadInputException, Consistency, Events, ServerError
 
 
 @pytest.mark.live
@@ -207,3 +206,15 @@ async def test_meta_schema_events(client):
     query = "DROP KEYSPACE testkeyspace"
     await client.execute(query)
     assert queue.get_nowait().options["target_name"] == "testkeyspace"
+
+
+@pytest.mark.live
+@pytest.mark.live_simple
+@pytest.mark.asyncio
+async def test_results_error_unavailable(client):
+    with pytest.raises(
+        ServerError,
+        match=r"received error_code=1000.*Cannot achieve consistency level THREE",
+    ):
+        query = "INSERT INTO  uprofile.user  (user_id, user_name , user_bcity) VALUES (45, 'Trump', 'Washington D.C.')"
+        await client.execute(query, consistency=Consistency.THREE)

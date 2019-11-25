@@ -1,10 +1,20 @@
-import typing
+from typing import Any
 
 
 class DriverError(Exception):
-    def __init__(self, *args: typing.Any, **kwargs: typing.Any) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         self.__dict__.update(kwargs)
+        self._display_keys = list(kwargs.keys())
         self._args = args
+
+    def __str__(self) -> str:
+        args = []
+        if len(self._args) > 0:
+            args.append(("description", f"{self._args[0]!r}"))
+        for key in self._display_keys:
+            args.append((key, f"{self.__dict__[key]!r}"))
+        text = ", ".join([f"{k}={v}" for k, v in args])
+        return f"{self.__class__.__name__}({text})"
 
 
 # bugs

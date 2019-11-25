@@ -65,6 +65,7 @@ class V4Protocol(Protocol):
             self.flags(),
             stream_id,
             compress=self.compress,
+            consistency=params.get("consistency"),
         )
 
     def register(self, stream_id: int, params: dict) -> "RegisterMessage":
@@ -99,6 +100,7 @@ class V4Protocol(Protocol):
             self.flags(),
             stream_id,
             compress=self.compress,
+            consistency=params.get("consistency"),
         )
 
     def event_handler(
@@ -161,8 +163,10 @@ class V4Protocol(Protocol):
         if opcode == Opcode.ERROR:
             assert isinstance(response, ErrorMessage)
             raise ServerError(
-                f'got error_code={response.error_code:x} with description="{response.error_text}"',
-                msg=response,
+                f"received error_code={response.error_code:x} response from server",
+                error_code=response.error_code,
+                error_text=response.error_text,
+                details=response.details,
             )
         return self.respond(request, response)
 

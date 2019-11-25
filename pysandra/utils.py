@@ -57,17 +57,20 @@ class PKZip:
 _LOGGER_INITIALIZED = False
 
 
-def enable_debug() -> None:
+def set_debug(enabled: bool) -> None:
     logger = logging.getLogger("pysandra")
-    logger.setLevel(logging.DEBUG)
-    handler = logging.StreamHandler(sys.stderr)
-    handler.setFormatter(
-        logging.Formatter(
-            fmt="%(levelname)s [%(asctime)s] %(name)s.%(funcName)s:%(lineno)d - %(message)s",
-            datefmt="%Y-%m-%d %H:%M:%S",
+    if enabled:
+        logger.setLevel(logging.DEBUG)
+        handler = logging.StreamHandler(sys.stderr)
+        handler.setFormatter(
+            logging.Formatter(
+                fmt="%(levelname)s [%(asctime)s] %(name)s.%(funcName)s:%(lineno)d - %(message)s",
+                datefmt="%Y-%m-%d %H:%M:%S",
+            )
         )
-    )
-    logger.addHandler(handler)
+        logger.addHandler(handler)
+    else:
+        logger.setLevel(logging.WARNING)
 
 
 def get_logger(name: str) -> logging.Logger:
@@ -82,6 +85,6 @@ def get_logger(name: str) -> logging.Logger:
 
         log_level = os.environ.get("PYSANDRA_LOG_LEVEL", "").upper()
         if log_level == "DEBUG":
-            enable_debug()
+            set_debug(True)
 
     return logging.getLogger(name)

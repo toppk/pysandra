@@ -25,6 +25,11 @@ DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 9042
 
 
+class HexEnum(int, Enum):
+    def __repr__(self) -> str:
+        return f"<{self.__class__.__name__}.{self._name_}: 0x{self._value_:x}>"
+
+
 class Opcode(int, Enum):
     ERROR = 0x00
     STARTUP = 0x01
@@ -65,7 +70,7 @@ class Options(str, Enum):
     THROW_ON_OVERLOAD = "THROW_ON_OVERLOAD"
 
 
-class Consitency(int, Enum):
+class Consistency(int, Enum):
     ANY = 0x0000
     ONE = 0x0001
     TWO = 0x0002
@@ -130,7 +135,7 @@ class Flags(int, Enum):
     WARNING = 0x08
 
 
-class ErrorCode(int, Enum):
+class ErrorCode(HexEnum):
     SERVER_ERROR = 0x0000
     PROTOCOL_ERROR = 0x000A
     AUTHENTICATION_ERROR = 0x0100
