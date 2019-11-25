@@ -1,6 +1,6 @@
 import pytest
 
-from pysandra import exceptions, protocol
+from pysandra import constants, exceptions, protocol
 from pysandra.constants import Opcode
 from pysandra.core import SBytes
 
@@ -129,3 +129,23 @@ def test_protocol_messages_supportedmsg_build():
         1, 2, 3, SBytes(b"\x00\x01\x00\x01a\x00\x02\x00\x01b\x00\x01c")
     )
     assert msg.options["a"] == ["b", "c"]
+
+
+def test_protocol_messages_errormsg_build():
+    msg = protocol.ErrorMessage.build(
+        1,
+        2,
+        3,
+        SBytes(
+            b'\x00\x00"\x00\x00;Invalid STRING constant (hillary) for "user_id" of type int'
+        ),
+    )
+    assert msg.error_code == constants.ErrorCode.INVALID
+
+
+def test_protocol_messages_event_build():
+    pass
+
+
+def test_protocol_messages_result_build():
+    pass

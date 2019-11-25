@@ -13,8 +13,10 @@ setup(
     version="0.2",
     packages=get_packages("cqlshell"),
     install_requires=["termtables"],
-    entry_points="""
-        [console_scripts]
-        cqlshell=cqlshell.main:cli
-    """,
+    entry_points={
+        "console_scripts": [
+            "cqlshell=cqlshell.main:cli",
+            "testasync=cqlshell.testasync:main",
+        ]
+    },
 )

@@ -1,7 +1,7 @@
 from collections.abc import Collection
 from enum import Enum
 from struct import Struct, pack, unpack
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
 
 from .constants import (
     COMPRESS_MINIMUM,
@@ -212,9 +212,11 @@ def decode_string_multimap(sbytes: "SBytes") -> Dict[str, List[str]]:
     num_entries = decode_short(sbytes)
     multimap: Dict[str, List[str]] = {}
     for _cnt in range(num_entries):
+        logger.debug(f"multimap num_entries={num_entries}")
         key = decode_string(sbytes)
         values = decode_strings_list(sbytes)
         multimap[key] = values
+    logger.debug("end multimap")
     return multimap
 
 
@@ -322,6 +324,24 @@ class ResponseMessage(BaseMessage):
         self.version = version
         self.flags = flags
         self.stream_id = stream_id
+
+    @classmethod
+    def create(
+        cls: Type["ResponseMessage"],
+        version: int,
+        flags: int,
+        stream_id: int,
+        body: "SBytes",
+    ) -> "ResponseMessage":
+        logger.debug(f"creating msg class={cls} with body={body!r}")
+        msg = cls.build(version, flags, stream_id, body)
+        if not body.at_end():
+            raise InternalDriverError(f"still data left remains={body.remaining!r}")
+        if msg is None:
+            raise InternalDriverError(
+                f"didn't generate a response message for opcode={cls.opcode}"
+            )
+        return msg
 
     @staticmethod
     def build(

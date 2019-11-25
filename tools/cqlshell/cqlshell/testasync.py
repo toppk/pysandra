@@ -7,6 +7,7 @@ from signal import Signals
 
 from pysandra import Client, Events, exceptions
 from pysandra.types import Rows, SchemaChange
+from pysandra.utils import enable_debug
 
 
 class Tester:
@@ -238,12 +239,19 @@ async def run(command, stop=False):
     await tester.close()
 
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("command")
     parser.add_argument("--stop", dest="stop", action="store_true")
     parser.add_argument("--no-stop", dest="stop", action="store_false")
+    parser.add_argument("--debug", "-d", dest="debug", action="store_true")
     parser.set_defaults(stop=False)
     args = parser.parse_args()
+    if args.debug:
+        enable_debug()
     asyncio.run(run(args.command, args.stop))
     print("finished")
+
+
+if __name__ == "__main__":
+    main()

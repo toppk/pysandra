@@ -1,5 +1,5 @@
 from asyncio import Queue, QueueFull
-from typing import Callable, Dict, Optional
+from typing import Callable, Dict, Optional, Type
 
 from .constants import EVENTS_QUEUE_MAXSIZE, Opcode
 from .core import SBytes
@@ -113,11 +113,8 @@ class V4Protocol(Protocol):
         if self._events is None:
             raise InternalDriverError(f"got event={body!r} when no registered occured")
         sbytes_body = SBytes(body)
-        msg = EventMessage.build(version, flags, stream_id, sbytes_body)
-        if not sbytes_body.at_end():
-            raise InternalDriverError(
-                f"still data left remains={sbytes_body.remaining!r}"
-            )
+        msg = EventMessage.create(version, flags, stream_id, sbytes_body)
+        assert isinstance(msg, EventMessage)
         try:
             self._events.put_nowait(msg.event)
         except QueueFull:
@@ -135,21 +132,21 @@ class V4Protocol(Protocol):
     ) -> "ExpectedResponses":
         sbytes_body = SBytes(body)
         response: Optional["ResponseMessage"] = None
-        factory: Optional[Callable] = None
+        factory: Optional[Type["ResponseMessage"]] = None
         try:
             opcode = Opcode(opcode_int)
         except ValueError:
             raise InternalDriverError(f"unknown optcode={opcode_int}")
         if opcode == Opcode.ERROR:
-            factory = ErrorMessage.build
+            factory = ErrorMessage
         elif opcode == Opcode.READY:
-            factory = ReadyMessage.build
+            factory = ReadyMessage
         elif opcode == Opcode.AUTHENTICATE:
             pass
         elif opcode == Opcode.SUPPORTED:
-            factory = SupportedMessage.build
+            factory = SupportedMessage
         elif opcode == Opcode.RESULT:
-            factory = ResultMessage.build
+            factory = ResultMessage
         elif opcode == Opcode.EVENT:
             pass
         elif opcode == Opcode.AUTH_CHALLENGE:
@@ -158,15 +155,8 @@ class V4Protocol(Protocol):
             pass
         if factory is None:
             raise UnknownPayloadException(f"unhandled message opcode={opcode!r}")
-        response = factory(version, flags, stream_id, sbytes_body)
-        if response is None:
-            raise InternalDriverError(
-                f"didn't generate a response message for opcode={opcode}"
-            )
-        if not sbytes_body.at_end():
-            raise InternalDriverError(
-                f"still data left remains={sbytes_body.remaining!r}"
-            )
+        logger.debug(f"calling create on factory={factory}")
+        response = factory.create(version, flags, stream_id, sbytes_body)
         # error can happen any time
         if opcode == Opcode.ERROR:
             assert isinstance(response, ErrorMessage)

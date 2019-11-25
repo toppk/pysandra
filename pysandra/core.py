@@ -1,8 +1,10 @@
 from typing import Any, Dict, Generic, List, Optional, Type, TypeVar, cast
 
 from .exceptions import InternalDriverError, MaximumStreamsException
+from .utils import get_logger
 
 # from .protocol import RequestMessage  # noqa: F401
+logger = get_logger(__name__)
 
 
 def pretty_type(value: Any) -> str:
