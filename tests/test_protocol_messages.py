@@ -1,8 +1,54 @@
 import pytest
 
 from pysandra import constants, exceptions, protocol
-from pysandra.constants import Opcode
+from pysandra.constants import Events, Opcode, SchemaChangeTarget
 from pysandra.core import SBytes
+
+
+def test_protocol_message_response_create_bad():
+    with pytest.raises(
+        exceptions.InternalDriverError, match=r"subclass should implement method"
+    ):
+
+        class MyResponse(protocol.ResponseMessage):
+            pass
+
+        MyResponse.create(1, 1, 1, SBytes(b""))
+
+
+def test_protocol_message_response_create_emtpy():
+    with pytest.raises(
+        exceptions.InternalDriverError, match=r"didn't generate a response message"
+    ):
+
+        class MyResponse(protocol.ResponseMessage):
+            @staticmethod
+            def build(version, flags, strem_id, body):
+                return None
+
+        MyResponse.create(1, 1, 1, SBytes(b""))
+
+
+def test_protocol_message_response_create_remains():
+    with pytest.raises(exceptions.InternalDriverError, match=r"left data remains"):
+
+        class MyResponse(protocol.ResponseMessage):
+            @staticmethod
+            def build(version, flags, strem_id, body):
+                return MyResponse(1, 2, 3)
+
+        MyResponse.create(1, 1, 1, SBytes(b"asdf"))
+
+
+def test_protocol_message_response_create_good():
+    class MyResponse(protocol.ResponseMessage):
+        @staticmethod
+        def build(version, flags, strem_id, body):
+            body.grab(4)
+            return MyResponse(1, 2, 3)
+
+    msg = MyResponse.create(1, 1, 1, SBytes(b"asdf"))
+    assert msg.version == 1
 
 
 def test_protocol_message_header_good():
@@ -149,8 +195,60 @@ def test_protocol_messages_errormsg_build_unavailable():
     assert msg.error_code == constants.ErrorCode.UNAVAILABLE_EXCEPTION
 
 
-def test_protocol_messages_event_build():
-    pass
+def test_protocol_messages_event_build_good():
+    body = b"\x00\rSCHEMA_CHANGE\x00\x07CREATED\x00\x08KEYSPACE\x00\x0ctestkeyspace"
+    msg = protocol.EventMessage.build(1, 2, 3, SBytes(body),)
+    assert msg.event_type == Events.SCHEMA_CHANGE
+
+
+def test_protocol_messages_event_build_badevent():
+    with pytest.raises(
+        exceptions.UnknownPayloadException, match=r"got unexpected event=SCHEMA_change"
+    ):
+        body = b"\x00\rSCHEMA_change\x00\x07CREATED\x00\x08KEYSPACE\x00\x0ctestkeyspace"
+        protocol.EventMessage.build(
+            1, 2, 3, SBytes(body),
+        )
+
+
+def test_protocol_messages_event_build_badchange():
+    with pytest.raises(
+        exceptions.UnknownPayloadException, match=r"got unexpected change_type=CRE4TED"
+    ):
+        body = b"\x00\rSCHEMA_CHANGE\x00\x07CRE4TED\x00\x08KEYSPACE\x00\x0ctestkeyspace"
+        protocol.EventMessage.build(
+            1, 2, 3, SBytes(body),
+        )
+
+
+def test_protocol_messages_event_build_badtargete():
+    with pytest.raises(
+        exceptions.UnknownPayloadException, match=r"got unexpected target=K3YSPACE"
+    ):
+        body = b"\x00\rSCHEMA_CHANGE\x00\x07CREATED\x00\x08K3YSPACE\x00\x0ctestkeyspace"
+        protocol.EventMessage.build(
+            1, 2, 3, SBytes(body),
+        )
+
+
+def test_protocol_messages_event_build_good_table():
+    body = (
+        b"\x00\rSCHEMA_CHANGE\x00\x07CREATED\x00\x05TABLE\x00\x07mykeysp\x00\x07mytable"
+    )
+    msg = protocol.EventMessage.build(1, 2, 3, SBytes(body),)
+    assert (
+        msg.event.options["target_name"] == "mytable"
+        and msg.event.target == SchemaChangeTarget.TABLE
+    )
+
+
+def test_protocol_messages_event_build_good_function():
+    body = b"\x00\rSCHEMA_CHANGE\x00\x07CREATED\x00\x08FUNCTION\x00\x07mykeysp\x00\x07mytable\x00\x02\x00\x03cat\x00\x04book"
+    msg = protocol.EventMessage.build(1, 2, 3, SBytes(body),)
+    assert (
+        msg.event.options["argument_types"] == ["cat", "book"]
+        and msg.event.target == SchemaChangeTarget.FUNCTION
+    )
 
 
 def test_protocol_messages_result_build():

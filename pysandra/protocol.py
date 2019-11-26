@@ -318,7 +318,7 @@ class RequestMessage(BaseMessage):
 
 
 class ResponseMessage(BaseMessage):
-    opcode: int
+    opcode: int = -1
 
     def __init__(self, version: int, flags: int, stream_id: int) -> None:
         self.version = version
@@ -439,17 +439,17 @@ class EventMessage(ResponseMessage):
     @staticmethod
     def decode_schema_change(body: "SBytes") -> "SchemaChange":
         # <change_type>
+        string = decode_string(body)
         try:
-            string = decode_string(body)
             change_type = SchemaChangeType(string)
         except ValueError:
-            raise UnknownPayloadException(f"got unexpected change_type={change_type}")
+            raise UnknownPayloadException(f"got unexpected change_type={string}")
         # <target>
+        string = decode_string(body)
         try:
-            string = decode_string(body)
             target = SchemaChangeTarget(string)
         except ValueError:
-            raise UnknownPayloadException(f"got unexpected target={target}")
+            raise UnknownPayloadException(f"got unexpected target={string}")
         # <options>
         options: Dict[str, Union[str, List[str]]] = {}
         if target == SchemaChangeTarget.KEYSPACE:
@@ -461,10 +461,6 @@ class EventMessage(ResponseMessage):
             options["keyspace_name"] = decode_string(body)
             options["target_name"] = decode_string(body)
             options["argument_types"] = decode_strings_list(body)
-        else:
-            raise InternalDriverError(
-                f"unhandled target={target} with body={body.remaining!r}"
-            )
 
         logger.debug(
             f"SCHEMA_CHANGE change_type={change_type} target={target} options={options}"

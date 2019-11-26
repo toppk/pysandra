@@ -208,7 +208,7 @@ async def test_dupddl(tester):
             "CREATE KEYSPACE testkeyspace WITH replication = {'class': 'NetworkTopologyStrategy', 'datacenter1' : '1' }"
         )
     except pysandra.ServerError as e:
-        print(f">>> got ServerError exception={e.msg.details}")
+        print(f">>> got ServerError exception={e.details}")
     await tester.run_query("DROP KEYSPACE testkeyspace")
 
 
