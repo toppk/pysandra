@@ -1,6 +1,8 @@
 # https://github.com/apache/cassandra/blob/trunk/doc/native_protocol_v4.spec
 from enum import Enum
 
+from .core import HexEnum
+
 # driver
 
 # max event queue size
@@ -25,12 +27,7 @@ DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 9042
 
 
-class HexEnum(int, Enum):
-    def __repr__(self) -> str:
-        return f"<{self.__class__.__name__}.{self._name_}: 0x{self._value_:x}>"
-
-
-class Opcode(int, Enum):
+class Opcode(HexEnum):
     ERROR = 0x00
     STARTUP = 0x01
     READY = 0x02
@@ -49,7 +46,7 @@ class Opcode(int, Enum):
     AUTH_SUCCESS = 0x10
 
 
-class Kind(int, Enum):
+class Kind(HexEnum):
     VOID = 0x0001
     ROWS = 0x0002
     SET_KEYSPACE = 0x0003
@@ -70,7 +67,7 @@ class Options(str, Enum):
     THROW_ON_OVERLOAD = "THROW_ON_OVERLOAD"
 
 
-class Consistency(int, Enum):
+class Consistency(HexEnum):
     ANY = 0x0000
     ONE = 0x0001
     TWO = 0x0002
@@ -84,13 +81,13 @@ class Consistency(int, Enum):
     LOCAL_ONE = 0x000A
 
 
-class ResultFlags(int, Enum):
+class ResultFlags(HexEnum):
     GLOBAL_TABLES_SPEC = 0x01
     HAS_MORE_PAGES = 0x02
     NO_METADATA = 0x04
 
 
-class OptionID(int, Enum):
+class OptionID(HexEnum):
     CUSTOM = 0x0000
     ASCII = 0x0001
     BIGINT = 0x0002
@@ -118,7 +115,7 @@ class OptionID(int, Enum):
     TUPLE = 0x0031
 
 
-class QueryFlags(int, Enum):
+class QueryFlags(HexEnum):
     VALUES = 0x01
     SKIP_METADATA = 0x02
     PAGE_SIZE = 0x04
@@ -128,7 +125,7 @@ class QueryFlags(int, Enum):
     WITH_NAMES_FOR_VALUES = 0x40
 
 
-class Flags(int, Enum):
+class Flags(HexEnum):
     COMPRESSION = 0x01
     TRACING = 0x02
     CUSTOM_PAYLOAD = 0x04

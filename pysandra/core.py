@@ -1,3 +1,4 @@
+from enum import Enum
 from typing import Any, Dict, Generic, List, Optional, Type, TypeVar, cast
 
 from .exceptions import InternalDriverError, MaximumStreamsException
@@ -5,6 +6,16 @@ from .utils import get_logger
 
 # from .protocol import RequestMessage  # noqa: F401
 logger = get_logger(__name__)
+
+
+class HexEnum(int, Enum):
+    def __format__(self, format_spec: str) -> str:
+        if format_spec == "r":
+            return f"{self._value_}"
+        return hex(self)
+
+    def __repr__(self) -> str:
+        return f"<{self.__class__.__name__}.{self._name_}: {hex(self)}>"
 
 
 def pretty_type(value: Any) -> str:

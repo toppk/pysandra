@@ -237,7 +237,7 @@ class Protocol:
         expected_version = SERVER_SENT | self.version
         if version != expected_version:
             raise VersionMismatchException(
-                f"received incorrect version from server, go version=0x{version:x} expected version=0x{expected_version:x}"
+                f"received incorrect version from server, go version={hex(version)} expected version={hex(expected_version)}"
             )
         return version, flags, stream, opcode, length
 

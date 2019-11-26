@@ -3,7 +3,7 @@
 python -m venv venv/
 source venv/bin/activate
 pip install -U pip setuptools wheel nox
-pip install -U mkdocs mkdocs-material mkautodoc
+pip install -U mkdocs mkdocs-material mkautodoc snakefood3
 pip install -U towncrier
 pip install -U twine
 pip install -r test-requirements.txt

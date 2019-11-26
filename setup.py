@@ -54,7 +54,7 @@ setup(
     install_requires=[],
     extras_require={
         "compression": ["python-snappy", "lz4"],
-        "docs": ["mkdocs", "mkdocs-material", "mkautodoc"],
+        "docs": ["mkdocs", "mkdocs-material", "mkautodoc", "snakefood3"],
     },
     classifiers=[
         "Development Status :: 3 - Alpha",

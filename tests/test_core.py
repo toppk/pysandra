@@ -1,7 +1,31 @@
 import pytest
 
-from pysandra.core import SBytes, Streams, pretty_type
+from pysandra.core import HexEnum, SBytes, Streams, pretty_type
 from pysandra.exceptions import InternalDriverError, MaximumStreamsException
+
+
+def test_hexenum_format_int():
+    class Foo(HexEnum):
+        BAR = 0x10
+
+    foo = Foo.BAR
+    assert f"{foo:r}" == "16"
+
+
+def test_hexenum_format_hex():
+    class Foo(HexEnum):
+        BAR = 0x10
+
+    foo = Foo.BAR
+    assert f"{foo}" == "0x10"
+
+
+def test_hexenum_repr():
+    class Foo(HexEnum):
+        BAR = 0x10
+
+    foo = Foo.BAR
+    assert repr(foo) == "<Foo.BAR: 0x10>"
 
 
 def test_pretty_type_int():

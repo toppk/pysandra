@@ -24,8 +24,9 @@ find pysandra -type f -name "*.py[co]" -delete
 find pysandra -type d -name __pycache__ -delete
 
 ${PREFIX}python setup.py sdist bdist_wheel
+${PREFIX}python -msnakefood3 . pysandra  | dot -Tpng  -Gsize=20,8\! -Gdpi=100 > docs/img/pydeps.png
 # ${PREFIX}twine upload dist/*
-${PREFIX}mkdocs gh-deploy
+# ${PREFIX}mkdocs gh-deploy
 
 echo "You probably want to also tag the version now:"
 echo "git tag -a ${VERSION} -m 'version ${VERSION}'"

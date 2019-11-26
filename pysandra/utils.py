@@ -6,8 +6,6 @@ from struct import Struct
 from types import ModuleType
 from typing import Any, List, Optional
 
-from .exceptions import InternalDriverError
-
 
 # this voodoo was just to get pytest coverage at 100%
 def fetch_module(name: str) -> Optional[ModuleType]:
@@ -44,13 +42,9 @@ class PKZip:
         return list(self._supported.keys())
 
     def compress(self, data: bytes, algo: str) -> bytes:
-        if algo not in self._supported:
-            raise InternalDriverError(f"not supported algo={algo}")
         return self._supported[algo][0](data)
 
     def decompress(self, cdata: bytes, algo: str) -> bytes:
-        if algo not in self._supported:
-            raise InternalDriverError(f"not supported algo={algo}")
         return self._supported[algo][1](cdata)
 
 

@@ -2,7 +2,6 @@ import os
 
 import pytest
 
-from pysandra.exceptions import InternalDriverError
 from pysandra.utils import PKZip, fetch_module, get_logger, set_debug
 
 
@@ -66,13 +65,13 @@ def test_pkzip_empty_snappy(pkzip):
 
 
 def test_pkzip_bad_algo_com(pkzip):
-    with pytest.raises(InternalDriverError, match=r"not supported algo"):
+    with pytest.raises(KeyError):
         data = b""
         pkzip.compress(data, "foo")
 
 
 def test_pkzip_bad_algo_dec(pkzip):
-    with pytest.raises(InternalDriverError, match=r"not supported algo"):
+    with pytest.raises(KeyError):
         data = b""
         pkzip.decompress(data, "foo")
 

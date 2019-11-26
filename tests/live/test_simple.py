@@ -63,7 +63,7 @@ async def test_simple_query_with_filtering(client):
 @pytest.mark.asyncio
 async def test_simple_query_needs_filtering(client):
     with pytest.raises(
-        ServerError, match=r"error_code=2200.*might involve data filtering"
+        ServerError, match=r"error_code=0x2200.*might involve data filtering"
     ):
         query = "SELECT * FROM uprofile.user where user_bcity='Dubai'"
         await client.execute(query)
@@ -74,7 +74,7 @@ async def test_simple_query_needs_filtering(client):
 @pytest.mark.asyncio
 async def test_simple_query_no_keyspace(client):
     with pytest.raises(
-        ServerError, match=r"error_code=2200.*No keyspace has been specified"
+        ServerError, match=r"error_code=0x2200.*No keyspace has been specified"
     ):
         query = "SELECT * FROM user where user_id=3"
         await client.execute(query)
@@ -128,7 +128,7 @@ async def test_simple_bad_prepare_int(client):
 @pytest.mark.asyncio
 async def test_simple_bad_data_query_server(client):
     with pytest.raises(
-        ServerError, match=r"error_code=2200.*Invalid STRING constant.*of type int"
+        ServerError, match=r"error_code=0x2200.*Invalid STRING constant.*of type int"
     ):
         query = "INSERT INTO  uprofile.user  (user_id, user_name , user_bcity) VALUES ('hillary', 2, 'DC')"
         await client.execute(query)
@@ -138,7 +138,9 @@ async def test_simple_bad_data_query_server(client):
 @pytest.mark.live_simple
 @pytest.mark.asyncio
 async def test_simple_bad_data_query_bound(client):
-    with pytest.raises(ServerError, match=r"error_code=2200.*Expected 4 or 0 byte int"):
+    with pytest.raises(
+        ServerError, match=r"error_code=0x2200.*Expected 4 or 0 byte int"
+    ):
         query = "INSERT INTO  uprofile.user  (user_id, user_name , user_bcity) VALUES (?,?,?)"
         data = ("hillary", "not", "DC")
         await client.execute(query, data)
@@ -148,7 +150,9 @@ async def test_simple_bad_data_query_bound(client):
 @pytest.mark.live_simple
 @pytest.mark.asyncio
 async def test_simple_bad_data_query_namedbound(client):
-    with pytest.raises(ServerError, match=r"error_code=2200.*Expected 4 or 0 byte int"):
+    with pytest.raises(
+        ServerError, match=r"error_code=0x2200.*Expected 4 or 0 byte int"
+    ):
         query = "INSERT INTO  uprofile.user  (user_id, user_name , user_bcity) VALUES (:id,:name,:city)"
         data = {"name": 666, "id": "hillary", "city": "DC"}
         await client.execute(query, data)
@@ -214,7 +218,7 @@ async def test_meta_schema_events(client):
 async def test_results_error_unavailable(client):
     with pytest.raises(
         ServerError,
-        match=r"received error_code=1000.*Cannot achieve consistency level THREE",
+        match=r"received error_code=0x1000.*Cannot achieve consistency level THREE",
     ):
         query = "INSERT INTO  uprofile.user  (user_id, user_name , user_bcity) VALUES (45, 'Trump', 'Washington D.C.')"
         await client.execute(query, consistency=Consistency.THREE)
