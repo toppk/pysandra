@@ -4,7 +4,7 @@ import os
 import sys
 from struct import Struct
 from types import ModuleType
-from typing import Any, List, Optional
+from typing import Any, Callable, List, Optional
 
 
 # this voodoo was just to get pytest coverage at 100%
@@ -41,11 +41,17 @@ class PKZip:
     def supported(self) -> List[str]:
         return list(self._supported.keys())
 
+    def get_compress(self, algo: str) -> Callable:
+        return self._supported[algo][0]
+
+    def get_decompress(self, algo: str) -> Callable:
+        return self._supported[algo][1]
+
     def compress(self, data: bytes, algo: str) -> bytes:
-        return self._supported[algo][0](data)
+        return self.get_compress(algo)(data)
 
     def decompress(self, cdata: bytes, algo: str) -> bytes:
-        return self._supported[algo][1](cdata)
+        return self.get_decompress(algo)(cdata)
 
 
 _LOGGER_INITIALIZED = False

@@ -9,6 +9,16 @@ def test_connection_basic():
     assert conn.host == "127.0.0.1"
 
 
+def test_connection_tls():
+    conn = Connection(use_tls=True)
+    assert not conn.tls.check_hostname
+
+
+def test_connection_not_connected():
+    conn = Connection(use_tls=True)
+    assert not conn.is_connected
+
+
 def test_connection_choices():
     conn = Connection()
     conn.make_choices({"COMPRESSION": ["snappy", "foz"]})

@@ -41,11 +41,13 @@ class Connection:
             context.check_hostname = False
             self.tls = context
         self.preferred_algo = PREFERRED_ALGO
+        self._compress: Optional[Callable] = None
+        self._decompress: Optional[Callable] = None
+
         self._is_ready = False
         self._in_startup = False
         self._is_connected = False
         self._options = options
-        self._pkzip = PKZip()
         self.supported_options: Optional[Dict[str, List[str]]] = None
         self._dispatcher: Optional["Dispatcher"] = None
 
@@ -114,8 +116,8 @@ class Connection:
         # READY may be compressed
         if "COMPRESSION" in self.options:
             logger.debug(f"setting dec2omress to algo={self.decompress}")
-            self._dispatcher.decompress = self.decompress
-            self.protocol.compress = self.compress
+            self._dispatcher.decompress = self._decompress
+            self.protocol.compress = self._compress
         is_ready = await self.make_call(
             self.protocol.startup, self.protocol.build_response, params=params
         )
@@ -130,25 +132,16 @@ class Connection:
         if self._read_task is not None and not from_listener:
             self._read_task.cancel()
 
-    def decompress(self, data: bytes) -> bytes:
-        if "COMPRESSION" not in self._options:
-            raise InternalDriverError(f"no compression selected")
-        return self._pkzip.decompress(data, self._options["COMPRESSION"])
-
-    def compress(self, data: bytes) -> bytes:
-        if "COMPRESSION" not in self._options:
-            raise InternalDriverError(f"no compression selected")
-        return self._pkzip.compress(data, self._options["COMPRESSION"])
-
     def make_choices(self, supported_options: Dict[str, List[str]]) -> None:
         self.supported_options = supported_options
         if self.supported_options is not None:
             # check options
             # set compression
+            pkzip = PKZip()
             if "COMPRESSION" in self.supported_options:
                 matches = [
                     algo
-                    for algo in self._pkzip.supported
+                    for algo in pkzip.supported
                     if algo in self.supported_options["COMPRESSION"]
                 ]
                 if len(matches) > 0:
@@ -158,6 +151,18 @@ class Connection:
                         else matches[0]
                     )
                     self._options["COMPRESSION"] = select
+                    self._compress = pkzip.get_compress(select)
+                    self._decompress = pkzip.get_decompress(select)
+
+    def decompress(self, data: bytes) -> bytes:
+        if self._decompress is None:
+            raise InternalDriverError("no compression selected")
+        return self._decompress(data)
+
+    def compress(self, data: bytes) -> bytes:
+        if self._compress is None:
+            raise InternalDriverError("no compression selected")
+        return self._compress(data)
 
     @property
     def options(self) -> Dict[str, str]:
