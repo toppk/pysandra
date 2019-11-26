@@ -328,3 +328,12 @@ def test_protocol_message_setkeyspaceresult():
     body = b"\x00\x00\x00\x03\x00\x08uprofile"
     msg = protocol.ResultMessage.build(1, 2, 3, SBytes(body),)
     assert msg.keyspace == "uprofile"
+
+
+def test_protocol_messages_register_bad():
+    with pytest.raises(
+        exceptions.TypeViolation,
+        match=r"unknown event=asdf. please use pysandra.Events",
+    ):
+        msg = protocol.RegisterMessage(["asdf"], 1, 1, 1)
+        msg.encode_body()
