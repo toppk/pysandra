@@ -646,12 +646,13 @@ class ResultMessage(ResponseMessage):
                     result_flags, columns_count, body
                 )
             # parse rows
-            rows = Rows(columns_count=columns_count)
+            rows = Rows(columns_count, col_specs=col_specs)
             rows_count = decode_int(body)
-            for _cnt in range(rows_count * columns_count):
-                rows.add(decode_int_bytes(body))
-            if col_specs is not None:
-                rows.col_specs = col_specs
+            for _rowcnt in range(rows_count):
+                row: List[Optional[bytes]] = []
+                for _colcnt in range(columns_count):
+                    row.append(decode_int_bytes(body))
+                rows.add_row(tuple(row))
             logger.debug(f"got col_specs={col_specs}")
             msg = RowsResultMessage(rows, kind, version, flags, stream_id)
 

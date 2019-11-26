@@ -47,7 +47,7 @@ class Tester:
         print(f"========> FINISHED")
 
     async def run_query(self, query, args=None, send_metadata=False):
-        print(f"========> RUNNING {query} args={args}")
+        print(f"========> RUNNING {query} args={args} send_metadata={send_metadata}")
         resp = await self.client.execute(query, args, send_metadata=send_metadata)
         if isinstance(resp, pysandra.Rows):
             for row in resp:
@@ -141,6 +141,9 @@ async def test_dml(tester):
         [[45, "Trump", "Washington D.C."]],
     )
     await tester.run_query("SELECT * FROM uprofile.user where user_id=45")
+    await tester.run_query(
+        "SELECT * FROM uprofile.user where user_id=45", send_metadata=True
+    )
     await tester.run_query("DELETE FROM uprofile.user where user_id=45")
     await tester.run_query("SELECT * FROM uprofile.user where user_id=45")
 

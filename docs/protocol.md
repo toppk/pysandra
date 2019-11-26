@@ -174,4 +174,6 @@ What is the correct CQL_VERSION (sec. 4.1.1).  If you send options first, what p
                                                the replica that was asked for data has not
                                               responded. Otherwise, the value is != 0.
 
-* when is global_tables_spec not sent? 
+* when is global_tables_spec not sent?
+
+* fault injection?

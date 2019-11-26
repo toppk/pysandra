@@ -76,6 +76,9 @@ def test_pkzip_bad_algo_dec(pkzip):
         pkzip.decompress(data, "foo")
 
 
+@pytest.mark.skipif(
+    os.environ.get("PYSANDRA_LOG_LEVEL") == "DEBUG", reason="debugging turned on"
+)
 def test_logging_debugnver(caplog):
     logger = get_logger("pysandra.pytest_")
     string = "this is a long string!"
@@ -83,6 +86,9 @@ def test_logging_debugnver(caplog):
     assert string not in caplog.text
 
 
+@pytest.mark.skipif(
+    os.environ.get("PYSANDRA_LOG_LEVEL") == "DEBUG", reason="debugging turned on"
+)
 def test_logging_debugon(caplog):
     import pysandra.utils
 
