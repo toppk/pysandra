@@ -1,6 +1,8 @@
 from collections.abc import Collection
 from enum import Enum
+from ipaddress import IPv4Address, IPv6Address
 from struct import Struct, pack, unpack
+from sys import byteorder
 from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
 
 from .constants import (
@@ -11,11 +13,13 @@ from .constants import (
     Events,
     Flags,
     Kind,
+    NodeStatus,
     Opcode,
     OptionID,
     QueryFlags,
     ResultFlags,
     SchemaChangeTarget,
+    TopologyStatus,
 )
 from .core import SBytes, pretty_type
 from .exceptions import (
@@ -25,7 +29,16 @@ from .exceptions import (
     UnknownPayloadException,
     VersionMismatchException,
 )
-from .types import ChangeEvent, ExpectedResponses, Rows, SchemaChange, SchemaChangeType
+from .types import (
+    ChangeEvent,
+    ExpectedResponses,
+    InetType,
+    Rows,
+    SchemaChange,
+    SchemaChangeType,
+    StatusChange,
+    TopologyChange,
+)
 from .utils import get_logger
 
 logger = get_logger(__name__)
@@ -107,6 +120,7 @@ def get_struct(fmt: str) -> Struct:
         formats = [
             f"{NETWORK_ORDER}{STypes.USHORT}",
             f"{NETWORK_ORDER}{STypes.INT}",
+            f"{NETWORK_ORDER}{STypes.BYTE}",
             f"{NETWORK_ORDER}{STypes.BYTE}{STypes.BYTE}{STypes.SHORT}{STypes.BYTE}{STypes.INT}",
             f"{NETWORK_ORDER}{STypes.USHORT}{STypes.BYTE}",
         ]
@@ -194,6 +208,18 @@ def decode_int_bytes(sbytes: "SBytes") -> Optional[bytes]:
     elif length < 0:
         return None
     return unpack(f"{NETWORK_ORDER}{length}{STypes.CHAR}", sbytes.grab(length))[0]
+
+
+def decode_inet(sbytes: "SBytes") -> "InetType":
+    length = get_struct(f"{NETWORK_ORDER}{STypes.BYTE}").unpack(sbytes.grab(1))[0]
+    if length not in (4, 16):
+        raise InternalDriverError(f"unhandled inet length={length}")
+    address = decode_short_bytes(length)
+    intaddress = int.from_bytes(address, byteorder=byteorder)
+    ipaddress = IPv4Address(intaddress) if length == 4 else IPv6Address(intaddress)
+    port = decode_int(sbytes)
+    assert isinstance(ipaddress, IPv4Address) or isinstance(ipaddress, IPv6Address)
+    return InetType(ipaddress, port)
 
 
 def decode_string(sbytes: "SBytes") -> str:
@@ -476,19 +502,26 @@ class EventMessage(ResponseMessage):
             event_type = Events(event)
         except ValueError:
             raise UnknownPayloadException(f"got unexpected event={event}")
+        event_obj: Optional["ChangeEvent"] = None
         if event_type == Events.TOPOLOGY_CHANGE:
-            pass
+            status = decode_string(body)
+            try:
+                topology_status = TopologyStatus(status)
+            except ValueError:
+                raise UnknownPayloadException(f"got unexpected status_change={status}")
+            node = decode_inet(body)
+            event_obj = TopologyChange(topology_status, node)
         elif event_type == Events.STATUS_CHANGE:
-            pass
+            status = decode_string(body)
+            try:
+                node_status = NodeStatus(status)
+            except ValueError:
+                raise UnknownPayloadException(f"got unexpected status_change={status}")
+            node = decode_inet(body)
+            event_obj = StatusChange(node_status, node)
         elif event_type == Events.SCHEMA_CHANGE:
             event_obj = EventMessage.decode_schema_change(body)
-
-        if event_obj is None:
-            raise InternalDriverError(
-                "didn't create and Event for event_type={event_type}"
-            )
-
-        logger.debug(f"EventResponse body={body!r}")
+        assert event_obj is not None
 
         return EventMessage(event_type, event_obj, version, flags, stream_id)
 

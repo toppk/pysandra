@@ -153,6 +153,16 @@ class ErrorCode(HexEnum):
     UNPREPARED = 0x2500
 
 
+class NodeStatus(str, Enum):
+    ON = "ON"
+    OFF = "OFF"
+
+
+class TopologyStatus(str, Enum):
+    NEW_NODE = "NEW_NODE"
+    REMOVED_NODE = "REMOVED_NODE"
+
+
 class SchemaChangeType(str, Enum):
     CREATED = "CREATED"
     UPDATED = "UPDATED"

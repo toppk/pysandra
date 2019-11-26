@@ -1,7 +1,13 @@
 from asyncio import Queue  # noqa
+from ipaddress import IPv4Address, IPv6Address  # noqa: F401
 from typing import Any, Dict, List, Optional, Union  # noqa
 
-from .constants import SchemaChangeTarget, SchemaChangeType  # noqa
+from .constants import (  # noqa
+    NodeStatus,
+    SchemaChangeTarget,
+    SchemaChangeType,
+    TopologyStatus,
+)
 
 ExpectedResponses = Union[
     str, bool, "Rows", bytes, "SchemaChange", "Queue[Any]", Dict[str, List[str]]
@@ -20,8 +26,28 @@ class AsciiType(BaseType):
     pass
 
 
+class InetType(BaseType):
+    def __init__(
+        self, ipaddress: Union["IPv4Address", "IPv6Address"], port: int
+    ) -> None:
+        self.ipaddress = ipaddress
+        self.port = port
+
+
 class ChangeEvent:
     pass
+
+
+class TopologyChange(ChangeEvent):
+    def __init__(self, topology_status: "TopologyStatus", node: "InetType") -> None:
+        self.topology_status = topology_status
+        self.node = node
+
+
+class StatusChange(ChangeEvent):
+    def __init__(self, node_status: "NodeStatus", node: "InetType") -> None:
+        self.node_status = node_status
+        self.node = node
 
 
 class SchemaChange(ChangeEvent):
