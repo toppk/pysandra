@@ -189,7 +189,7 @@ async def test_meta_query_none_false(client):
 @pytest.mark.live
 @pytest.mark.live_simple
 @pytest.mark.asyncio
-async def test_meta_prepared(client):
+async def test_meta_prepared_nouse(client):
     client.reset = True
     prepare = (
         "INSERT INTO  uprofile.user  (user_id, user_name , user_bcity) VALUES (?,?,?)"
@@ -198,6 +198,27 @@ async def test_meta_prepared(client):
     data = [45, "Trump", "Washington D.C."]
     resp = await client.execute(stmt_id, data, send_metadata=True)
     assert resp.col_specs is None
+
+
+@pytest.mark.live
+@pytest.mark.live_simple
+@pytest.mark.asyncio
+async def test_meta_query_use(client):
+    client.reset = True
+    query = "use uprofile"
+    await client.execute(query, send_metadata=False)
+    query = "select * from user where user_id=4"
+    resp = await client.execute(query, send_metadata=True)
+    assert resp.col_specs[0]["name"] == "user_id"
+
+
+@pytest.mark.live
+@pytest.mark.live_simple
+@pytest.mark.asyncio
+async def test_meta_query_nouse(client):
+    query = "select user_id from uprofile.user where user_id=4"
+    resp = await client.execute(query, send_metadata=True)
+    assert resp.col_specs[0]["name"] == "user_id"
 
 
 @pytest.mark.live
@@ -222,3 +243,12 @@ async def test_results_error_unavailable(client):
     ):
         query = "INSERT INTO  uprofile.user  (user_id, user_name , user_bcity) VALUES (45, 'Trump', 'Washington D.C.')"
         await client.execute(query, consistency=Consistency.THREE)
+
+
+@pytest.mark.live
+@pytest.mark.live_simple
+@pytest.mark.asyncio
+async def test_live_simple_use_keyspace(client):
+    query = "use uprofile"
+    resp = await client.execute(query, consistency=Consistency.THREE)
+    assert resp == "uprofile"

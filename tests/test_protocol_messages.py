@@ -282,3 +282,49 @@ def test_protocol_messages_preparedresults_meta():
             "tablename": "user",
         },
     ]
+
+
+def test_protocol_messages_rowresults_global():
+    body = (
+        b"\x00\x00\x00\x02\x00\x00\x00\x01\x00\x00\x00\x03\x00\x08uprofile\x00\x04user"
+        + b"\x00\x07user_id\x00\t\x00\tuser_name\x00\r\x00\nuser_bcity\x00\r\x00\x00\x00\x01"
+        + b"\x00\x00\x00\x04\x00\x00\x00\x04\x00\x00\x00\x06Ehtevs\x00\x00\x00\x04Pune"
+    )
+    msg = protocol.ResultMessage.build(1, 2, 3, SBytes(body),)
+    assert msg.rows.col_specs == [
+        {"ksname": "uprofile", "name": "user_id", "option_id": 9, "tablename": "user"},
+        {
+            "ksname": "uprofile",
+            "name": "user_name",
+            "option_id": 13,
+            "tablename": "user",
+        },
+        {
+            "ksname": "uprofile",
+            "name": "user_bcity",
+            "option_id": 13,
+            "tablename": "user",
+        },
+    ]
+
+
+def test_protocol_messages_rowresults_noglobal():
+    body = (
+        b"\x00\x00\x00\x02\x00\x00\x00\x01\x00\x00\x00\x03\x00\x08uprofile\x00\x04user\x00"
+        + b"\x07user_id\x00\t\x00\tuser_name\x00\r\x00\nuser_bcity\x00\r\x00\x00\x00\x01\x00"
+        + b"\x00\x00\x04\x00\x00\x00\x04\x00\x00\x00\x06Ehtevs\x00\x00\x00\x04Pune"
+    )
+    msg = protocol.ResultMessage.build(1, 2, 3, SBytes(body),)
+    assert msg.rows.col_specs[0]["name"] == "user_id"
+
+
+def test_protocol_messages_voidresults():
+    body = b"\x00\x00\x00\x01"
+    msg = protocol.ResultMessage.build(1, 2, 3, SBytes(body),)
+    assert isinstance(msg, protocol.VoidResultMessage)
+
+
+def test_protocol_message_setkeyspaceresult():
+    body = b"\x00\x00\x00\x03\x00\x08uprofile"
+    msg = protocol.ResultMessage.build(1, 2, 3, SBytes(body),)
+    assert msg.keyspace == "uprofile"

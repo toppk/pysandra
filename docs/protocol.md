@@ -173,3 +173,5 @@ What is the correct CQL_VERSION (sec. 4.1.1).  If you send options first, what p
  * what does vallue != 0 mean? <data_present> is a single byte. If its value is 0, it means
                                                the replica that was asked for data has not
                                               responded. Otherwise, the value is != 0.
+
+* when is global_tables_spec not sent? 

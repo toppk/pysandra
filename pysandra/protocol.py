@@ -20,6 +20,7 @@ from .constants import (
     ResultFlags,
     SchemaChangeTarget,
     TopologyStatus,
+    WriteType,
 )
 from .core import SBytes, pretty_type
 from .exceptions import (
@@ -201,6 +202,13 @@ def decode_short_bytes(sbytes: "SBytes") -> bytes:
     return unpack(f"{NETWORK_ORDER}{length}{STypes.CHAR}", sbytes.grab(length))[0]
 
 
+def decode_length_bytes(sbytes: "SBytes", length: int) -> bytes:
+    assert length is not None
+    if length == 0:
+        return b""
+    return unpack(f"{NETWORK_ORDER}{length}{STypes.CHAR}", sbytes.grab(length))[0]
+
+
 def decode_int_bytes(sbytes: "SBytes") -> Optional[bytes]:
     length = decode_int(sbytes)
     if length == 0:
@@ -210,11 +218,23 @@ def decode_int_bytes(sbytes: "SBytes") -> Optional[bytes]:
     return unpack(f"{NETWORK_ORDER}{length}{STypes.CHAR}", sbytes.grab(length))[0]
 
 
+def decode_consistency(sbytes: "SBytes") -> "Consistency":
+    code = decode_short(sbytes)
+    try:
+        return Consistency(code)
+    except ValueError:
+        raise InternalDriverError(f"unknown consistency={code:x}")
+
+
+def decode_byte(sbytes: "SBytes") -> int:
+    return get_struct(f"{NETWORK_ORDER}{STypes.BYTE}").unpack(sbytes.grab(1))[0]
+
+
 def decode_inet(sbytes: "SBytes") -> "InetType":
-    length = get_struct(f"{NETWORK_ORDER}{STypes.BYTE}").unpack(sbytes.grab(1))[0]
+    length = decode_byte(sbytes)
     if length not in (4, 16):
         raise InternalDriverError(f"unhandled inet length={length}")
-    address = decode_short_bytes(length)
+    address = decode_length_bytes(sbytes, length)
     intaddress = int.from_bytes(address, byteorder=byteorder)
     ipaddress = IPv4Address(intaddress) if length == 4 else IPv6Address(intaddress)
     port = decode_int(sbytes)
@@ -430,21 +450,48 @@ class ErrorMessage(ResponseMessage):
         error_text = decode_string(body)
         if error_code == ErrorCode.UNAVAILABLE_EXCEPTION:
             #                 <cl><required><alive>
-            details["consistency_level"] = decode_short(body)
+            details["consistency_level"] = decode_consistency(body)
             details["required"] = decode_int(body)
             details["alive"] = decode_int(body)
         elif error_code == ErrorCode.WRITE_TIMEOUT:
-            pass
+            #                 <cl><received><blockfor><writeType>
+            details["consistency_level"] = decode_consistency(body)
+            details["received"] = decode_int(body)
+            details["block_for"] = decode_int(body)
+            string = decode_string(body)
+            try:
+                details["write_type"] = WriteType(string)
+            except ValueError:
+                raise InternalDriverError("unknown write_type={string}")
         elif error_code == ErrorCode.READ_TIMEOUT:
-            pass
+            # <cl><received><blockfor><data_present>
+            details["consistency_level"] = decode_consistency(body)
+            details["received"] = decode_int(body)
+            details["block_for"] = decode_int(body)
+            details["data_present"] = decode_byte(body)
         elif error_code == ErrorCode.READ_FAILURE:
-            pass
+            # <cl><received><blockfor><numfailures><data_present>
+            details["consistency_level"] = decode_consistency(body)
+            details["received"] = decode_int(body)
+            details["block_for"] = decode_int(body)
+            details["num_failures"] = decode_int(body)
+            details["data_present"] = decode_byte(body)
         elif error_code == ErrorCode.FUNCTION_FAILURE:
             details["keyspace"] = decode_string(body)
             details["function"] = decode_string(body)
             details["arg_types"] = decode_strings_list(body)
         elif error_code == ErrorCode.WRITE_FAILURE:
-            pass
+            # <cl><received><blockfor><numfailures><write_type>
+            details["consistency_level"] = decode_consistency(body)
+            details["received"] = decode_int(body)
+            details["block_for"] = decode_int(body)
+            details["num_failures"] = decode_int(body)
+            details["data_present"] = decode_byte(body)
+            string = decode_string(body)
+            try:
+                details["write_type"] = WriteType(string)
+            except ValueError:
+                raise InternalDriverError("unknown write_type={string}")
         elif error_code == ErrorCode.ALREADY_EXISTS:
             details["keyspace"] = decode_string(body)
             details["table"] = decode_string(body)
@@ -546,7 +593,7 @@ class ResultMessage(ResponseMessage):
             # <table>
             global_table = decode_string(body)
             logger.debug(
-                f"build keyspace={global_keyspace} table={global_table} result_flags={result_flags!r}"
+                f"using global_table_spec keyspace={global_keyspace} table={global_table} result_flags={result_flags!r}"
             )
         # <col_spec_i>
         col_specs = []
@@ -555,6 +602,8 @@ class ResultMessage(ResponseMessage):
                 col_spec: Dict[str, Union[str, int]] = {}
                 if result_flags & ResultFlags.GLOBAL_TABLES_SPEC == 0:
                     # <ksname><tablename>
+                    logger.debug(f"not using global_table_spec")
+
                     col_spec["ksname"] = decode_string(body)
                     col_spec["tablename"] = decode_string(body)
                 else:
@@ -603,6 +652,7 @@ class ResultMessage(ResponseMessage):
                 rows.add(decode_int_bytes(body))
             if col_specs is not None:
                 rows.col_specs = col_specs
+            logger.debug(f"got col_specs={col_specs}")
             msg = RowsResultMessage(rows, kind, version, flags, stream_id)
 
         elif kind == Kind.SET_KEYSPACE:
