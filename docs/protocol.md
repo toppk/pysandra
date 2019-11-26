@@ -169,3 +169,7 @@ What is the correct CQL_VERSION (sec. 4.1.1).  If you send options first, what p
 * bad data in bind vs direct has differetn error strings
 
 * speeling consitency
+
+ * what does vallue != 0 mean? <data_present> is a single byte. If its value is 0, it means
+                                               the replica that was asked for data has not
+                                              responded. Otherwise, the value is != 0.

@@ -175,3 +175,14 @@ class SchemaChangeTarget(str, Enum):
     TYPE = "TYPE"
     FUNCTION = "FUNCTION"
     AGGREGATE = "AGGREGATE"
+
+
+class WriteType(str, Enum):
+    SIMPLE = "SIMPLE"
+    BATCH = "BATCH"
+    UNLOGGED_BATCH = "UNLOGGED_BATCH"
+    COUNTER = "COUNTER"
+    BATCH_LOG = "BATCH_LOG"
+    CAS = "CAS"
+    VIEW = "VIEW"
+    CDC = "CDC"

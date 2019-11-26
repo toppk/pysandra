@@ -1,8 +1,18 @@
-from pysandra.types import Rows, SchemaChange
+from pysandra import types
 
 
-def test_rows():
-    d = Rows(columns_count=2)
+def test_types_inet():
+    o = types.InetType(1, 2)
+    assert o.port == 2
+
+
+def test_types_topologychange():
+    o = types.TopologyChange(1, 2)
+    assert o.node == 2
+
+
+def test_types_rows():
+    d = types.Rows(columns_count=2)
     d.add(b"1")
     d.add(b"2")
     d.add(b"3")
@@ -10,8 +20,8 @@ def test_rows():
     assert list(d) == [[b"1", b"2"], [b"3", b"4"]]
 
 
-def test_rows_reset():
-    d = Rows(columns_count=2)
+def test_types_rows_reset():
+    d = types.Rows(columns_count=2)
     d.add(b"1")
     d.add(b"2")
     d.add(b"3")
@@ -20,6 +30,11 @@ def test_rows_reset():
     assert count == 4
 
 
-def test_schemachange():
-    sc = SchemaChange(None, None, None)
+def test_types_schemachange():
+    sc = types.SchemaChange(None, None, None)
     assert sc.options is None
+
+
+def test_types_statuschange():
+    sc = types.StatusChange(1, 2)
+    assert sc.node == 2

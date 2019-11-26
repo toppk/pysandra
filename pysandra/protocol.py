@@ -426,7 +426,7 @@ class ErrorMessage(ResponseMessage):
         try:
             error_code = ErrorCode(code)
         except ValueError:
-            raise InternalDriverError(f"unknown error code={code}")
+            raise InternalDriverError(f"unknown error_code={code:x}")
         error_text = decode_string(body)
         if error_code == ErrorCode.UNAVAILABLE_EXCEPTION:
             #                 <cl><required><alive>

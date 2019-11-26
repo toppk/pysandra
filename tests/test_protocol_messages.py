@@ -177,7 +177,7 @@ def test_protocol_messages_supportedmsg_build():
     assert msg.options["a"] == ["b", "c"]
 
 
-def test_protocol_messages_errormsg_build():
+def test_protocol_messages_errormsg_build_good():
     msg = protocol.ErrorMessage.build(
         1,
         2,
@@ -187,6 +187,15 @@ def test_protocol_messages_errormsg_build():
         ),
     )
     assert msg.error_code == constants.ErrorCode.INVALID
+
+
+def test_protocol_messages_errormsg_build_err():
+    with pytest.raises(
+        exceptions.InternalDriverError, match=r"unknown error_code=feebad"
+    ):
+        protocol.ErrorMessage.build(
+            1, 2, 3, SBytes(b"\x00\xfe\xeb\xad\x00"),
+        )
 
 
 def test_protocol_messages_errormsg_build_unavailable():
@@ -251,5 +260,25 @@ def test_protocol_messages_event_build_good_function():
     )
 
 
-def test_protocol_messages_result_build():
-    pass
+def test_protocol_messages_preparedresults_meta():
+    body = (
+        b"\x00\x00\x00\x04\x00\x10\xac\xfc\x0fW\xa9\x9c\x1cr\xaf\xcaP9<\xd2c\x8d\x00\x00\x00"
+        + b"\x01\x00\x00\x00\x03\x00\x00\x00\x01\x00\x00\x00\x08uprofile\x00\x04user\x00\x07user_id\x00"
+        + b"\t\x00\tuser_name\x00\r\x00\nuser_bcity\x00\r\x00\x00\x00\x04\x00\x00\x00\x00"
+    )
+    msg = protocol.ResultMessage.build(1, 2, 3, SBytes(body),)
+    assert msg.col_specs == [
+        {"ksname": "uprofile", "name": "user_id", "option_id": 9, "tablename": "user"},
+        {
+            "ksname": "uprofile",
+            "name": "user_name",
+            "option_id": 13,
+            "tablename": "user",
+        },
+        {
+            "ksname": "uprofile",
+            "name": "user_bcity",
+            "option_id": 13,
+            "tablename": "user",
+        },
+    ]
