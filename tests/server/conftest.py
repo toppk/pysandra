@@ -7,8 +7,9 @@ from pysandra.v4protocol import V4Protocol
 
 
 class Cassim:
-    def __init__(self, port=0):
+    def __init__(self, condition, port=0):
         self.port = port
+        self.condition = condition
         self._proto = V4Protocol(server_role=True)
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -33,16 +34,19 @@ class Cassim:
         return self._sock.getsockname()
 
     def listen_for_traffic(self):
-        print("startup")
-        self._sock.listen(1)
+        # self.condition.()
+        print("\nCASSIM: startup")
+        self._sock.listen(5)
+        print("\nCASSIM: listen")
+        self.condition.release()
         connection, address = self._sock.accept()
         connected = True
-        print("accepted")
+        print("CASSIM: accepted")
         while connected:
             try:
                 header = connection.recv(9)
             except OSError as e:
-                print(f"got oserror={e}")
+                print(f"CASSIM: got oserror={e}")
                 connected = False
                 continue
             if len(header) == 0:
@@ -54,21 +58,24 @@ class Cassim:
                 body = connection.recv(length)
             request = header + body
             if request in self.echo:
-                print(f"found header={header!r}")
+                print(f"CASSIM: found header={header!r}")
                 connection.send(self.echo[request])
             else:
-                print(f"didn't find header={header!r}")
+                print(f"CASSIM: didn't find header={header!r}")
                 connected = False
-        connection.close()
+        # connection.close()
 
 
 @pytest.fixture
 def server():
-    tcp_server = Cassim()
+    condition = threading.Semaphore()
+    condition.acquire()
+    tcp_server = Cassim(condition)
     with tcp_server as example_server:
         thread = threading.Thread(target=example_server.listen_for_traffic)
         thread.daemon = True
         thread.start()
+        condition.acquire()
         yield example_server
 
 
@@ -79,9 +86,12 @@ if __name__ == "__main__":
     port = 0
     if len(sys.argv) > 1:
         port = int(sys.argv[1])
-    tcp_server = Cassim(port=port)
+    condition = threading.Semaphore()
+    condition.acquire()
+    tcp_server = Cassim(condition, port=port)
     with tcp_server as example_server:
         thread = threading.Thread(target=example_server.listen_for_traffic)
         thread.start()
+        condition.acquire()
         print(example_server.addr)
         # thread.daemon = True

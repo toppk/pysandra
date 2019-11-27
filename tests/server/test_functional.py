@@ -27,3 +27,4 @@ async def test_server_functional_connect(server):
     # client = Client()
     await client.connect()
     assert client.is_connected
+    await client.close()

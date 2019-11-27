@@ -94,9 +94,9 @@ def test_streams_error():
 
 def test_sbytes_at_end():
     t = SBytes(b"12345")
-    print(f"{t.grab(1)!r}{t.at_end()}")
-    print(f"{t.grab(3)!r}{t.at_end()}")
-    print(f"{t.grab(1)!r}{t.at_end()}")
+    t.grab(1)
+    t.grab(3)
+    t.grab(1)
     assert t.at_end()
 
 
@@ -114,14 +114,14 @@ def test_sbytes_remaining():
 
 def test_sbytes_not_end():
     t = SBytes(b"12345")
-    print(f"{t.grab(1)!r}{t.at_end()}")
-    print(f"{t.grab(3)!r}{t.at_end()}")
+    t.grab(1)
+    t.grab(3)
     assert not t.at_end()
 
 
 def test_sbytes_overflow():
     with pytest.raises(InternalDriverError, match=r"cannot go beyond"):
         t = SBytes(b"12345")
-        print(f"{t.grab(1)!r}{t.at_end()}")
-        print(f"{t.grab(3)!r}{t.at_end()}")
-        print(f"{t.grab(2)!r}{t.at_end()}")
+        t.grab(1)
+        t.grab(3)
+        t.grab(2)
