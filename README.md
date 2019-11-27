@@ -65,9 +65,9 @@ Aims to be:
 
 * get real data
 * paging
-* api docs
 * AUTH
 * Tests
+* api docs
 * make user objects user friendly (exceptions, EventChage, Rows)
 * batch
 * client connection routing

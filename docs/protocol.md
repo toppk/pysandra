@@ -1,9 +1,10 @@
 
 
-=== Status
+## Status
 
-==== wireprotocol
+### wireprotocol
 
+```python
   1. Overview - done
   2. Frame header - mostly
     2.1. version - done (see notes below)
@@ -42,14 +43,17 @@
   8. Result paging - not done
   9. Error codes - not done
   10. Changes from v3 - ignored
+```
 
-==== cql scope support
+### cql scope support
+
 http://cassandra.apache.org/doc/latest/cql/index.html
+
 vs
 
 https://github.com/apache/cassandra/blob/trunk/doc/cql3/CQL.textile
 
-
+```
     Definitions
         Conventions
         Identifiers and keywords
@@ -138,27 +142,21 @@ https://github.com/apache/cassandra/blob/trunk/doc/cql3/CQL.textile
         3.0.2
         3.0.1
         Versioning
+```
 
 
+## Here are some thoughts on the protocol specification (currently using v4)
 
-=== Here are some thoughts on the protocol specification (currently using v4)
-
-stream (sec 2.3) is listed as [short] which is a 2 byte unsigned value (sec 3.) , but has a maximum value of
+* stream (sec 2.3) is listed as [short] which is a 2 byte unsigned value (sec 3.) , but has a maximum value of
 2 ** 15 (sec 2.3) and can contain a flag value of -1 (sec 2.3 & sec 4.2.6)
-
-How to remove registration
-
-What is the license for the protocol documents?
-
-if options returns supoported method options={'PROTOCOL_VERSIONS': ['3/v3', '4/v4', '5/v5-beta'], 'COMPRESSION': ['snappy', 'lz4'], 'CQL_VERSION': ['3.4.4']}
+* How to remove registration
+* What is the license for the protocol documents?
+* if options returns supoported method options={'PROTOCOL_VERSIONS': ['3/v3', '4/v4', '5/v5-beta'], 'COMPRESSION': ['snappy', 'lz4'], 'CQL_VERSION': ['3.4.4']}
 What is the correct CQL_VERSION (sec. 4.1.1).  If you send options first, what protocol_version should you used (sec 2.1)   THROW_ON_OVERLOAD  NO_COMPACT CQL_VERSION
-
-(sec 5)     # Cassandra writes the uncompressed message length in big endian order,
+* (sec 5)     # Cassandra writes the uncompressed message length in big endian order,
             # but the lz4 lib requires little endian order, so we wrap these
             # functions to handle that
-
-
-# READY is compressed???
+* READY is compressed???
 
 * should I do execute with/o values?
 
@@ -170,9 +168,9 @@ What is the correct CQL_VERSION (sec. 4.1.1).  If you send options first, what p
 
 * speeling consitency
 
- * what does vallue != 0 mean? <data_present> is a single byte. If its value is 0, it means
+* what does `value != 0 mean? <data_present> is a single byte. If its value is 0, it means
                                                the replica that was asked for data has not
-                                              responded. Otherwise, the value is != 0.
+                                              responded. Otherwise, the value is != 0.`
 
 * when is global_tables_spec not sent?
 
