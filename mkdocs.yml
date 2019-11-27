@@ -10,6 +10,7 @@ edit_uri: ""
 
 nav:
     - Introduction: 'index.md'
+    - API: 'api.md'
     - Developing: 'developing.md'
     - Contributors: 'contributors.md'
     - Protocol: 'protocol.md'

@@ -29,6 +29,16 @@ def online(f: Callable) -> Callable:
 
 
 class Client:
+    """
+    A Cassandra driver, with an asyncio interface
+
+    Usage:
+    ```
+    >>> client = pysandra.Client((host,port))
+    >>> resp = await client.execute("SELECT * FROM uprofile.users")
+    ```
+    """
+
     def __init__(
         self,
         host: Optional[Tuple[str, int]] = None,
@@ -77,6 +87,12 @@ class Client:
         return self._conn.is_ready
 
     async def connect(self) -> None:
+        """
+        If you wish to start the connection explicitely you can call
+        this method.  However, it is not necessary, as the driver
+        will attempt to create a connection at any time if it is
+        needed and not already connected.
+        """
         if not self._conn.is_ready:
             status = await self._conn.startup()
             if status:

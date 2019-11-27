@@ -62,6 +62,7 @@ def serve(session):
     session.install(
         "--upgrade", "mkdocs", "mkdocs-material", "mkautodoc>=0.1.0", "snakefood3"
     )
+    session.install("-e", ".")
     session.run("mkdocs", "serve")
 
 

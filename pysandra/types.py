@@ -99,6 +99,10 @@ class Row:
 
 
 class Rows:
+    """
+    This is the container for data queried from cassandra
+    """
+
     def __init__(
         self, columns_count: int, col_specs: Optional[List[Dict[str, Any]]] = None
     ) -> None:
