@@ -34,7 +34,7 @@ async def test_dispatcher_receive():
     d = Dispatcher(None, mock_reader, None)
     d._reader = mock_reader
     stream = SBytes(b"\x85\x00\x00\x00\x00\x02\x01\x00\x02\xaa\xbb")
-    mock_reader.read = get_mock_coro(lambda x: stream.grab(x))
+    mock_reader.readexactly = get_mock_coro(lambda x: stream.grab(x))
     # mock_reader.returns = b'\01\84\00\00\08\00'
     data = await d._receive(lambda x: [1, 2, 0, 2, 2])
     assert data[5] == b"\xaa\xbb"

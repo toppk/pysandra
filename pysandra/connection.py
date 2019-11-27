@@ -26,6 +26,7 @@ class Connection:
         self,
         host: Tuple[str, int] = None,
         use_tls: bool = False,
+        no_compress: bool = False,
         options: Optional[Dict[str, str]] = None,
     ) -> None:
         self.protocol = V4Protocol()
@@ -34,6 +35,7 @@ class Connection:
 
         self.host = host[0] if host is not None else DEFAULT_HOST
         self.port = host[1] if host is not None else DEFAULT_PORT
+        self.no_compress = no_compress
         self.tls: Optional["ssl.SSLContext"] = None
         if use_tls:
             context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
@@ -43,7 +45,7 @@ class Connection:
         self.preferred_algo = PREFERRED_ALGO
         self._compress: Optional[Callable] = None
         self._decompress: Optional[Callable] = None
-
+        self._read_task: Optional["asyncio.Future"] = None
         self._is_ready = False
         self._in_startup = False
         self._is_connected = False
@@ -53,6 +55,7 @@ class Connection:
 
     @property
     def is_connected(self) -> bool:
+        logger.debug(f"is_connected={self._is_connected}")
         return self._is_connected
 
     @property
@@ -82,10 +85,14 @@ class Connection:
         try:
             while True:
                 await self._dispatcher.cycle()
+        except asyncio.IncompleteReadError as e:
+            exp = ConnectionDroppedError(e)
+            logger.warning(f" connection dropped, going to close")
+            await self._dispatcher.end_all(exp)
         except ConnectionResetError as e:
             exp = ConnectionDroppedError(e)
             logger.warning(f" connection dropped, going to close")
-            self._dispatcher.end_all(exp)
+            await self._dispatcher.end_all(exp)
         except asyncio.CancelledError:
             logger.debug(f"got CanceledError")
             await self.close(True)
@@ -102,7 +109,7 @@ class Connection:
         reader, writer = await asyncio.open_connection(
             self.host, self.port, ssl=self.tls
         )
-        self._connected = True
+        self._is_connected = True
         self._dispatcher = Dispatcher(self.protocol, reader, writer)
         # avoid create_task for 3.6 compatability
         self._read_task = asyncio.ensure_future(self._listener())
@@ -127,8 +134,9 @@ class Connection:
         return is_ready
 
     async def close(self, from_listener: bool = False) -> None:
-        assert self._dispatcher is not None
-        await self._dispatcher.close()
+
+        if self._dispatcher is not None:
+            await self._dispatcher.close()
         if self._read_task is not None and not from_listener:
             self._read_task.cancel()
 
@@ -138,7 +146,7 @@ class Connection:
             # check options
             # set compression
             pkzip = PKZip()
-            if "COMPRESSION" in self.supported_options:
+            if "COMPRESSION" in self.supported_options and not self.no_compress:
                 matches = [
                     algo
                     for algo in pkzip.supported

@@ -74,9 +74,11 @@ class Dispatcher:
         self, decoder: Callable
     ) -> Tuple[int, int, int, int, int, bytes]:
         assert self._reader is not None
-        head = await self._reader.read(9)
+        head = await self._reader.readexactly(9)
+        logger.debug(f"length of header={len(head)} at_eof={self._reader.at_eof()}")
         version, flags, stream_id, opcode, length = decoder(head)
-        body = await self._reader.read(length)
+        body = await self._reader.readexactly(length)
+        logger.debug(f" got response head={head!r} body={body!r}")
         if flags & Flags.COMPRESSION:
             logger.debug(f"body={body!r}")
             assert self.decompress is not None

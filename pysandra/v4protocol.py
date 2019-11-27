@@ -1,5 +1,5 @@
 from asyncio import Queue, QueueFull
-from typing import Callable, Dict, Optional, Type
+from typing import Any, Callable, Dict, Optional, Type
 
 from .constants import EVENTS_QUEUE_MAXSIZE, Opcode
 from .core import SBytes
@@ -35,7 +35,8 @@ logger = get_logger(__name__)
 class V4Protocol(Protocol):
     version = 0x04
 
-    def __init__(self, default_flags: int = 0x00) -> None:
+    def __init__(self, default_flags: int = 0x00, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
         self._default_flags = default_flags
         self.compress: Optional[Callable] = None
         self._prepared: Dict[bytes, "PreparedResultMessage"] = {}

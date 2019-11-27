@@ -33,10 +33,11 @@ class Client:
         self,
         host: Optional[Tuple[str, int]] = None,
         use_tls: bool = False,
+        no_compress: bool = False,
         debug_signal: Optional["signal.Signals"] = None,
     ) -> None:
         # this protocol will never be used, just placating mypy
-        self._conn = Connection(host=host, use_tls=use_tls)
+        self._conn = Connection(host=host, use_tls=use_tls, no_compress=no_compress)
         self._in_startup = False
         self._is_ready_event = asyncio.Event()
         if debug_signal is not None:
@@ -69,11 +70,16 @@ class Client:
 
     @property
     def is_connected(self) -> bool:
+        return self._conn.is_connected
+
+    @property
+    def is_ready(self) -> bool:
         return self._conn.is_ready
 
     async def connect(self) -> None:
         if not self._conn.is_ready:
-            if await self._conn.startup():
+            status = await self._conn.startup()
+            if status:
                 self._is_ready_event.set()
             else:
                 try:

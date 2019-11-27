@@ -273,6 +273,9 @@ class Protocol:
     version: int
     compress: Optional[Callable]
 
+    def __init__(self, server_role: bool = False) -> None:
+        self.server_role = server_role
+
     def decode_header(self, header: bytes) -> Tuple[int, int, int, int, int]:
         version, flags, stream, opcode, length = get_struct(
             f"{NETWORK_ORDER}{STypes.BYTE}{STypes.BYTE}{STypes.SHORT}{STypes.BYTE}{STypes.INT}"
@@ -280,7 +283,10 @@ class Protocol:
         logger.debug(
             f"got head={header!r} containing version={version:x} flags={flags:x} stream={stream:x} opcode={opcode:x} length={length:x}"
         )
-        expected_version = SERVER_SENT | self.version
+        if self.server_role:
+            expected_version = ~SERVER_SENT & self.version
+        else:
+            expected_version = SERVER_SENT | self.version
         if version != expected_version:
             raise VersionMismatchException(
                 f"received incorrect version from server, go version={hex(version)} expected version={hex(expected_version)}"
@@ -351,7 +357,9 @@ class RequestMessage(BaseMessage):
             logger.debug("compressing the request")
             body = self.compress(body)
         header: bytes = self.encode_header(len(body))
-        logger.debug(f"opcode={self.opcode} header={header!r} body={body!r}")
+        logger.debug(
+            f"encoded request opcode={self.opcode} header={header!r} body={body!r}"
+        )
         return header + body
 
     def encode_body(self) -> bytes:

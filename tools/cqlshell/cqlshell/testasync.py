@@ -148,6 +148,16 @@ async def test_dml(tester):
     await tester.run_query("SELECT * FROM uprofile.user where user_id=45")
 
 
+async def test_sim(tester, port=None):
+    await tester.close()
+    print(f"port={port}")
+
+    tester = Tester(pysandra.Client(host=("127.0.0.1", port), no_compress=True))
+    await tester.connect()
+    print(f"is connected = {tester.client.is_connected}")
+    print(f"is ready = {tester.client.is_ready}")
+
+
 async def test_tls(tester):
     await tester.close()
     # tester = Tester(Client(host=("127.0.0.1", 9042), use_tls=False, debug_signal=Signals.SIGUSR1))
@@ -215,11 +225,12 @@ async def test_dupddl(tester):
     await tester.run_query("DROP KEYSPACE testkeyspace")
 
 
-async def run(command, stop=False):
+async def run(command, stop=False, port=None):
     if command not in (
         "ddl",
         "error",
         "dml",
+        "sim",
         "full",
         "dupddl",
         "ssl",
@@ -232,26 +243,38 @@ async def run(command, stop=False):
         print(f"ERROR:unknown command={command}")
         sys.exit(1)
     tester = Tester(pysandra.Client(debug_signal=Signals.SIGUSR1))
-    await tester.connect()
+    # await tester.connect()
     if command in ("ddl", "full",):
+        await tester.connect()
         await test_ddl(tester)
     if command in ("dml", "full",):
+        await tester.connect()
         await test_dml(tester)
     if command in ("meta", "full",):
+        await tester.connect()
         await test_meta(tester)
     if command in ("bad",):
+        await tester.connect()
         await test_bad(tester)
     if command in ("ssl",):
+        await tester.connect()
         await test_tls(tester)
+    if command in ("sim",):
+        await test_sim(tester, port=port)
     if command in ("dml2",):
+        await tester.connect()
         await test_dml2(tester)
     if command in ("use",):
+        await tester.connect()
         await test_use(tester)
     if command in ("error",):
+        await tester.connect()
         await test_error(tester)
     if command in ("dupddl",):
+        await tester.connect()
         await test_dupddl(tester)
     if command in ("events",):
+        await tester.connect()
         await test_events(tester)
 
     await tester.close()
@@ -260,6 +283,7 @@ async def run(command, stop=False):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("command")
+    parser.add_argument("--port", "-p", dest="port")
     parser.add_argument("--stop", dest="stop", action="store_true")
     parser.add_argument("--no-stop", dest="stop", action="store_false")
     parser.add_argument("--debug", "-d", dest="debug", action="store_true")
@@ -267,7 +291,7 @@ def main():
     args = parser.parse_args()
     if args.debug:
         set_debug(True)
-    asyncio.run(run(args.command, args.stop))
+    asyncio.run(run(args.command, args.stop, port=args.port))
     print("finished")
 
 

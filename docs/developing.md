@@ -31,7 +31,8 @@ pytest # run all tests
 pytest -m "not live" # run only unit tests
 python -mcqlshell.testasync dml  # run the dml test function
 PYSANDRA_LOG_LEVEL=DEBUG python -mcqlshell.testasync dml  # run the dml test function with debug logging
-testasync dml -d # same as above
+testasync dml -d
+testasync sim --port 37891 -d # connect to sim server
 ```
 
 There are scripts inside pysandra/scripts to help with these steps.  (e.g. scripts/bootstrap will setup a virtualenv and install the packages).  You can also run the test automation tool nox.  Nox will setup its own virtualenvs for execution, however you will still need to be inside of the virtualenv if you don't have nox installed elsewhere.  By default nox will do a complete pipeline of linting, formating, then test suits, and ensuring that all packages are up to date.  It will also run the test suit against several different python interpretors.  There are many ways you can run it, for example:
