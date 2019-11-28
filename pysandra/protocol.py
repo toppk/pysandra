@@ -153,6 +153,13 @@ def encode_string(value: Union[str, bytes]) -> bytes:
     )
 
 
+def encode_bytes(value: Union[bytes]) -> bytes:
+    value_bytes = value
+    return encode_short(len(value_bytes)) + pack(
+        f"{NETWORK_ORDER}{len(value_bytes)}{STypes.CHAR}", value_bytes
+    )
+
+
 def encode_value(value: Optional[Union[str, bytes, int]]) -> bytes:
     if value is None:
         return encode_int(-1)
@@ -897,7 +904,7 @@ class QueryMessage(RequestMessage):
                     )
 
                 for value, spec in zip(query_params, col_specs):
-                    if spec["option_id"] == OptionID.INT:
+                    if spec["option_id"] in (OptionID.BIGINT, OptionID.INT):
                         if not isinstance(value, int):
                             raise BadInputException(
                                 f"expected type=int but got type={pretty_type(value)} for value={value!r}"
@@ -905,7 +912,27 @@ class QueryMessage(RequestMessage):
                         body += pack(
                             f"{NETWORK_ORDER}{STypes.INT}{STypes.INT}", 4, value
                         )
-                    elif spec["option_id"] == OptionID.VARCHAR:
+                    elif spec["option_id"] in (OptionID.BLOB,):
+                        # what about buffer
+                        if not isinstance(value, bytes) and not isinstance(
+                            value, bytearray
+                        ):
+                            raise BadInputException(
+                                f"expected type=bytes/bytearray but got type={pretty_type(value)} for value={value!r}"
+                            )
+                        body += encode_bytes(value)
+
+                    elif spec["option_id"] in (OptionID.BOOLEAN,):
+                        # what about buffer
+                        if not isinstance(value, bool):
+                            raise BadInputException(
+                                f"expected type=bool but got type={pretty_type(value)} for value={value!r}"
+                            )
+                        body += pack(
+                            f"{NETWORK_ORDER}{STypes.INT}{STypes.INT}", 4, (0, 1)[value]
+                        )
+
+                    elif spec["option_id"] in (OptionID.ASCII, OptionID.VARCHAR):
                         if not isinstance(value, str):
                             raise BadInputException(
                                 f"expected type=str but got type={pretty_type(value)} for value={value!r}"

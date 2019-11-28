@@ -198,6 +198,30 @@ async def test_dml2(tester):
     await tester.run_simple_query("DELETE FROM uprofile.user where user_id=45")
 
 
+async def test_types(tester):
+    # wheres counter
+    await tester.run_query(
+        "CREATE KEYSPACE IF NOT EXISTS uprofile WITH replication = {'class': 'NetworkTopologyStrategy', 'datacenter1' : '1' }"
+    )
+    await tester.run_query(
+        "CREATE TABLE IF NOT EXISTS uprofile.alltypes (myascii ascii, mybigint bigint, myblob blob, myboolean boolean, "
+        + "mydate date, mydecimal decimal, mydouble double, myfloat float, myinet inet, myint int, mysmallint smallint, "
+        + "mytext text, mytime time, mytimestamp timestamp, mytimeuuid timeuuid, mytinyint tinyint, myuuid uuid, "
+        + "myvarchar varchar, myvarint varint, PRIMARY KEY( myint))"
+    )
+    await tester.run_query(
+        "CREATE TABLE IF NOT EXISTS uprofile.countertypes (myascii ascii, mybigint bigint,  mycounter1 counter, "
+        + "mycounter2 counter, PRIMARY KEY(myascii, mybigint))"
+    )
+    await tester.run_prepare(
+        "INSERT INTO  uprofile.alltypes  (myascii, mybigint, myblob, myboolean, mydate, mydecimal, mydouble, "
+        + "myfloat, myinet, myint, mysmallint, mytext, mytime, mytimestamp, mytimeuuid, mytinyint, myuuid, "
+        + "myvarchar, myvarint) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        [["1", 2, b"3", True, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]],
+        consistency=pysandra.Consistency.ONE,
+    )
+
+
 async def test_ddl(tester):
     await tester.run_query(
         "CREATE KEYSPACE IF NOT EXISTS uprofile WITH replication = {'class': 'NetworkTopologyStrategy', 'datacenter1' : '1' }"
@@ -234,6 +258,7 @@ async def run(command, stop=False, port=None):
         "full",
         "dupddl",
         "ssl",
+        "types",
         "events",
         "use",
         "bad",
@@ -259,6 +284,9 @@ async def run(command, stop=False, port=None):
     if command in ("ssl",):
         await tester.connect()
         await test_tls(tester)
+    if command in ("types",):
+        await tester.connect()
+        await test_types(tester)
     if command in ("sim",):
         await test_sim(tester, port=port)
     if command in ("dml2",):

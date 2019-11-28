@@ -85,16 +85,25 @@ class Row:
             [f"{k}={v!r}" for k, v in zip(self.fields, self.args)]
         )
 
+    def __len__(self) -> int:
+        return len(self.args)
+
     def __iter__(self) -> Iterator[Any]:
         return self.args.__iter__()
 
     def __getattr__(self, name: str) -> str:
         return self.args[self.fields.index(name)]
 
+    def __dir__(self) -> List[str]:
+        return [
+            x for x in super().__dir__() if x not in ("args", "fields")
+        ] + self.fields
+
+    # return self.fields
     def __getitem__(self, index: int) -> Optional[bytes]:
         return self.args[index]
 
-    def _asdict(self) -> "OrderedDict":
+    def asdict_(self) -> "OrderedDict":
         return OrderedDict(zip(self.fields, self.args))
 
 
@@ -116,6 +125,12 @@ class Rows:
 
     def __iter__(self) -> "Rows":
         return self
+
+    def __getitem__(self, index: int) -> Union["Row", Tuple[Optional[bytes], ...]]:
+        return self._data[index]
+
+    def __len__(self) -> int:
+        return len(self._data)
 
     @property
     def col_specs(self) -> Optional[List[Dict[str, Any]]]:

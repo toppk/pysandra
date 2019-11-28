@@ -11,6 +11,8 @@ edit_uri: ""
 nav:
     - Introduction: 'index.md'
     - API: 'api.md'
+    - Constants: 'constants.md'
+    - Types: 'types.md'
     - Developing: 'developing.md'
     - Contributors: 'contributors.md'
     - Protocol: 'protocol.md'

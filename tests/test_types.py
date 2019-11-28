@@ -41,6 +41,18 @@ def test_types_rows_specs_a4():
     assert list(d)[0].two == b"2"
 
 
+def test_types_rows_specs_len():
+    d = types.Rows(2)
+    d.add_row((b"1", b"2"))
+    assert len(d) == 1
+
+
+def test_types_rows_specs_offset():
+    d = types.Rows(2)
+    d.add_row((b"1", b"2"))
+    assert d[0] == (b"1", b"2")
+
+
 def test_types_rows_reset():
     d = types.Rows(2)
     d.add_row((b"1", b"2"))
@@ -57,12 +69,12 @@ def test_types_rows_specs_repr():
     assert f"{list(d)[0]}" == "Row(one=b'1', two=b'2')"
 
 
-def test_types_rows_specs_dict():
+def test_types_row_specs_dict():
     d = types.Row(1, 2, 3, fields=["a", "b", "c"])
-    assert dict(d._asdict()) == {"a": 1, "b": 2, "c": 3}
+    assert dict(d.asdict_()) == {"a": 1, "b": 2, "c": 3}
 
 
-def test_types_rows_specs_iter():
+def test_types_row_specs_iter():
     d = types.Row(1, 2, 3, fields=["a", "b", "c"])
     cnt = 0
     for _ele in d:
@@ -70,9 +82,19 @@ def test_types_rows_specs_iter():
     assert cnt == 3
 
 
-def test_types_rows_specs_item():
+def test_types_row_specs_item():
     d = types.Row(1, 2, 3, fields=["a", "b", "c"])
     assert d[2] == 3
+
+
+def test_types_row_specs_len():
+    d = types.Row(b"1", b"2", fields=["a", "b"])
+    assert len(d) == 2
+
+
+def test_types_row_specs_dir():
+    d = types.Row(b"1", b"2", fields=["a", "b"])
+    assert "args" not in dir(d) and "a" in dir(d)
 
 
 def test_types_schemachange():
