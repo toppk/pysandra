@@ -37,7 +37,7 @@ class Cassim:
         # self.condition.()
         print("\nCASSIM: startup")
         self._sock.listen(5)
-        print("\nCASSIM: listen")
+        print("CASSIM: listen")
         self.condition.release()
         connection, address = self._sock.accept()
         connected = True

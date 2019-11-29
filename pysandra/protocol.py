@@ -1086,7 +1086,6 @@ class QueryMessage(RequestMessage):
                                 for c, d in enumerate(reversed(value.as_tuple().digits))
                             )
                         )
-                        print(f"scale={scale!r} unscaled={unscaled!r}")
                         body += encode_int(len(scale + unscaled)) + scale + unscaled
                     else:
                         raise InternalDriverError(

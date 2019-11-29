@@ -91,7 +91,9 @@ class V4Protocol(Protocol):
                 f"missing statement_id={statement_id} in prepared statements"
             )
         prepared = self._prepared[statement_id]
-        logger.debug(f"have prepared col_specs={prepared.col_specs}")
+        logger.debug(
+            f"have prepared col_specs={prepared.col_specs} statement_id={statement_id} and params={params}"
+        )
         return ExecuteMessage(
             statement_id,
             params["query_params"],

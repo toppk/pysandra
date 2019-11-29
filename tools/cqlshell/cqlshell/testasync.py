@@ -236,7 +236,7 @@ async def test_types(tester):
                 11,
                 "12",
                 13,
-                datetime.datetime.now(),
+                datetime.datetime(2019, 11, 29, 17, 41, 14, 138904),
                 uuid.UUID("769280c8-12f0-11ea-8899-60a44ce97462"),
                 16,
                 uuid.UUID("f92630a6-d994-440e-a2dc-fe6b28e93829"),
@@ -293,7 +293,7 @@ async def run(command, stop=False, port=None):
     ):
         print(f"ERROR:unknown command={command}")
         sys.exit(1)
-    tester = Tester(pysandra.Client(debug_signal=Signals.SIGUSR1))
+    tester = Tester(pysandra.Client(debug_signal=Signals.SIGUSR1, no_compress=True))
     # await tester.connect()
     if command in ("ddl", "full",):
         await tester.connect()

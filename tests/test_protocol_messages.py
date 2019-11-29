@@ -1,7 +1,7 @@
 import pytest
 
 from pysandra import constants, exceptions, protocol
-from pysandra.constants import Events, Opcode, SchemaChangeTarget
+from pysandra.constants import Consistency, Events, Opcode, SchemaChangeTarget
 from pysandra.core import SBytes
 
 
@@ -337,3 +337,170 @@ def test_protocol_messages_register_bad():
     ):
         msg = protocol.RegisterMessage(["asdf"], 1, 1, 1)
         msg.encode_body()
+
+
+def test_protocol_messages_execute_alltypes():
+    import datetime
+    import decimal
+    import ipaddress
+    import uuid
+
+    expected_body = (
+        b"\x00\x10W\xa5g\xe7\xd3r'\xc1\x85\xf7\x06}<\xc3\xadp\x00\x01\x03\x00\x13\x00"
+        + b"\x00\x00\x011\x00\x00\x00\x08\x00\x00\x00\x00\x00\x00\x00\x02"
+        + b"\x00\x00\x00\x02\x03\x06\x00\x00\x00\x01\x00\x00\x00\x00\x04\x80\x00G6\x00"
+        + b"\x00\x00\t\x00\x00\x00\x08\r\xf9\x03C?\x00\x00\x00\x08@\x1c~M"
+        + b"\xe3\xb8\xa1\x9d\x00\x00\x00\x04A\x05\x82\xe4\x00\x00\x00\x10&\x07\xf8\xb0"
+        + b"@\x06\x08\x13\x00\x00\x00\x00\x00\x00 \x0e\x00\x00\x00\x04\x00\x00\x00\n"
+        + b"\x00\x00\x00\x02\x00\x0b\x00\x00\x00\x0212\x00\x00\x00\x08\x00\x00\x00\x00"
+        + b"\x00\x00\x00\r\x00\x00\x00\x08\x00\x00\x01n\xb8@\xa3\x1b\x00\x00\x00\x10"
+        + b"v\x92\x80\xc8\x12\xf0\x11\xea\x88\x99`\xa4L\xe9tb\x00\x00\x00\x01"
+        + b"\x10\x00\x00\x00\x10\xf9&0\xa6\xd9\x94D\x0e\xa2\xdc\xfek(\xe98)\x00\x00\x00"
+        + b"\x0218\x00\x00\x00\x01\x13"
+    )
+    msg = protocol.ExecuteMessage(
+        b"W\xa5g\xe7\xd3r'\xc1\x85\xf7\x06}<\xc3\xadp",
+        [
+            "1",
+            2,
+            b"\x03\x06",
+            False,
+            datetime.date(2019, 11, 29),
+            decimal.Decimal("600.12315455"),
+            7.123344,
+            8.344455999,
+            ipaddress.IPv6Address("2607:f8b0:4006:813::200e"),
+            10,
+            11,
+            "12",
+            13,
+            datetime.datetime(2019, 11, 29, 17, 41, 14, 138904),
+            uuid.UUID("769280c8-12f0-11ea-8899-60a44ce97462"),
+            16,
+            uuid.UUID("f92630a6-d994-440e-a2dc-fe6b28e93829"),
+            "18",
+            19,
+        ],
+        False,
+        [
+            {
+                "ksname": "uprofile",
+                "tablename": "alltypes",
+                "name": "myascii",
+                "option_id": 1,
+            },
+            {
+                "ksname": "uprofile",
+                "tablename": "alltypes",
+                "name": "mybigint",
+                "option_id": 2,
+            },
+            {
+                "ksname": "uprofile",
+                "tablename": "alltypes",
+                "name": "myblob",
+                "option_id": 3,
+            },
+            {
+                "ksname": "uprofile",
+                "tablename": "alltypes",
+                "name": "myboolean",
+                "option_id": 4,
+            },
+            {
+                "ksname": "uprofile",
+                "tablename": "alltypes",
+                "name": "mydate",
+                "option_id": 17,
+            },
+            {
+                "ksname": "uprofile",
+                "tablename": "alltypes",
+                "name": "mydecimal",
+                "option_id": 6,
+            },
+            {
+                "ksname": "uprofile",
+                "tablename": "alltypes",
+                "name": "mydouble",
+                "option_id": 7,
+            },
+            {
+                "ksname": "uprofile",
+                "tablename": "alltypes",
+                "name": "myfloat",
+                "option_id": 8,
+            },
+            {
+                "ksname": "uprofile",
+                "tablename": "alltypes",
+                "name": "myinet",
+                "option_id": 16,
+            },
+            {
+                "ksname": "uprofile",
+                "tablename": "alltypes",
+                "name": "myint",
+                "option_id": 9,
+            },
+            {
+                "ksname": "uprofile",
+                "tablename": "alltypes",
+                "name": "mysmallint",
+                "option_id": 19,
+            },
+            {
+                "ksname": "uprofile",
+                "tablename": "alltypes",
+                "name": "mytext",
+                "option_id": 13,
+            },
+            {
+                "ksname": "uprofile",
+                "tablename": "alltypes",
+                "name": "mytime",
+                "option_id": 18,
+            },
+            {
+                "ksname": "uprofile",
+                "tablename": "alltypes",
+                "name": "mytimestamp",
+                "option_id": 11,
+            },
+            {
+                "ksname": "uprofile",
+                "tablename": "alltypes",
+                "name": "mytimeuuid",
+                "option_id": 15,
+            },
+            {
+                "ksname": "uprofile",
+                "tablename": "alltypes",
+                "name": "mytinyint",
+                "option_id": 20,
+            },
+            {
+                "ksname": "uprofile",
+                "tablename": "alltypes",
+                "name": "myuuid",
+                "option_id": 12,
+            },
+            {
+                "ksname": "uprofile",
+                "tablename": "alltypes",
+                "name": "myvarchar",
+                "option_id": 13,
+            },
+            {
+                "ksname": "uprofile",
+                "tablename": "alltypes",
+                "name": "myvarint",
+                "option_id": 14,
+            },
+        ],
+        4,
+        0,
+        0,
+        consistency=Consistency.ONE,
+    )
+    assert msg.encode_body() == expected_body
