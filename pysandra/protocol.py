@@ -1,6 +1,9 @@
+import datetime
+import decimal
+import ipaddress
+import uuid
 from collections.abc import Collection
 from enum import Enum
-from ipaddress import IPv4Address, IPv6Address
 from struct import Struct, pack, unpack
 from sys import byteorder
 from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
@@ -105,11 +108,14 @@ NETWORK_ORDER = "!"
 class STypes(str, Enum):
     NetOrder = "!"
     INT = "l"
+    UINT = "L"
     LONG = "q"
     SHORT = "h"
     USHORT = "H"
     BYTE = "B"
     CHAR = "s"
+    FLOAT = "f"
+    DOUBLE = "d"
 
 
 structs: dict = {}
@@ -155,9 +161,15 @@ def encode_string(value: Union[str, bytes]) -> bytes:
 
 def encode_bytes(value: Union[bytes]) -> bytes:
     value_bytes = value
-    return encode_short(len(value_bytes)) + pack(
+    return encode_int(len(value_bytes)) + pack(
         f"{NETWORK_ORDER}{len(value_bytes)}{STypes.CHAR}", value_bytes
     )
+
+
+# https://stackoverflow.com/questions/21017698/converting-int-to-bytes-in-python-3/54141411#54141411
+def encode_varint(value: int) -> bytes:
+    length = ((value + (value < 0)).bit_length() + 8) // 8
+    return value.to_bytes(length, byteorder="big", signed=True)
 
 
 def encode_value(value: Optional[Union[str, bytes, int]]) -> bytes:
@@ -243,10 +255,16 @@ def decode_inet(sbytes: "SBytes") -> "InetType":
         raise InternalDriverError(f"unhandled inet length={length}")
     address = decode_length_bytes(sbytes, length)
     intaddress = int.from_bytes(address, byteorder=byteorder)
-    ipaddress = IPv4Address(intaddress) if length == 4 else IPv6Address(intaddress)
+    ipaddr = (
+        ipaddress.IPv4Address(intaddress)
+        if length == 4
+        else ipaddress.IPv6Address(intaddress)
+    )
     port = decode_int(sbytes)
-    assert isinstance(ipaddress, IPv4Address) or isinstance(ipaddress, IPv6Address)
-    return InetType(ipaddress, port)
+    assert isinstance(ipaddr, ipaddress.IPv4Address) or isinstance(
+        ipaddr, ipaddress.IPv6Address
+    )
+    return InetType(ipaddr, port)
 
 
 def decode_string(sbytes: "SBytes") -> str:
@@ -904,7 +922,7 @@ class QueryMessage(RequestMessage):
                     )
 
                 for value, spec in zip(query_params, col_specs):
-                    if spec["option_id"] in (OptionID.BIGINT, OptionID.INT):
+                    if spec["option_id"] in (OptionID.INT,):
                         if not isinstance(value, int):
                             raise BadInputException(
                                 f"expected type=int but got type={pretty_type(value)} for value={value!r}"
@@ -912,6 +930,37 @@ class QueryMessage(RequestMessage):
                         body += pack(
                             f"{NETWORK_ORDER}{STypes.INT}{STypes.INT}", 4, value
                         )
+                    elif spec["option_id"] in (OptionID.TINYINT,):
+                        if not isinstance(value, int):
+                            raise BadInputException(
+                                f"expected type=int but got type={pretty_type(value)} for value={value!r}"
+                            )
+                        body += pack(
+                            f"{NETWORK_ORDER}{STypes.INT}{STypes.BYTE}", 1, value
+                        )
+                    elif spec["option_id"] in (OptionID.SMALLINT,):
+                        if not isinstance(value, int):
+                            raise BadInputException(
+                                f"expected type=int but got type={pretty_type(value)} for value={value!r}"
+                            )
+                        body += pack(
+                            f"{NETWORK_ORDER}{STypes.INT}{STypes.SHORT}", 2, value
+                        )
+                    elif spec["option_id"] in (OptionID.BIGINT,):
+                        if not isinstance(value, int):
+                            raise BadInputException(
+                                f"expected type=int but got type={pretty_type(value)} for value={value!r}"
+                            )
+                        body += pack(
+                            f"{NETWORK_ORDER}{STypes.INT}{STypes.LONG}", 8, value
+                        )
+                    elif spec["option_id"] in (OptionID.VARINT,):
+                        if not isinstance(value, int):
+                            raise BadInputException(
+                                f"expected type=int but got type={pretty_type(value)} for value={value!r}"
+                            )
+                        res = encode_varint(value)
+                        body += encode_int(len(res)) + res
                     elif spec["option_id"] in (OptionID.BLOB,):
                         # what about buffer
                         if not isinstance(value, bytes) and not isinstance(
@@ -921,6 +970,63 @@ class QueryMessage(RequestMessage):
                                 f"expected type=bytes/bytearray but got type={pretty_type(value)} for value={value!r}"
                             )
                         body += encode_bytes(value)
+                    elif spec["option_id"] in (OptionID.TIME,):
+                        # what about buffer
+                        if not isinstance(value, int):
+                            raise BadInputException(
+                                f"expected type=int but got type={pretty_type(value)} for value={value!r}"
+                            )
+                        maxvalue = 60 * 60 * 24 * 10 ** 9 - 1
+                        if value < 0 or value >= maxvalue:
+                            raise BadInputException(
+                                f"value for type={spec['option_id']} is out of range 0 < X < {maxvalue} for value={value!r}"
+                            )
+
+                        body += pack(
+                            f"{NETWORK_ORDER}{STypes.INT}{STypes.LONG}", 8, value
+                        )
+
+                    elif spec["option_id"] in (OptionID.DATE,):
+                        # what about buffer
+                        if not isinstance(value, datetime.date):
+                            raise BadInputException(
+                                f"expected type=datetime.date but got type={pretty_type(value)} for value={value!r}"
+                            )
+                        body += pack(
+                            f"{NETWORK_ORDER}{STypes.INT}{STypes.UINT}",
+                            4,
+                            (value - datetime.date.fromtimestamp(0)).days + 2 ** 31,
+                        )
+                    elif spec["option_id"] in (OptionID.TIMESTAMP,):
+                        # what about buffer
+                        if not isinstance(value, datetime.datetime):
+                            raise BadInputException(
+                                f"expected type=datetime.date but got type={pretty_type(value)} for value={value!r}"
+                            )
+                        body += pack(
+                            f"{NETWORK_ORDER}{STypes.INT}{STypes.LONG}",
+                            8,
+                            round(
+                                value.replace(tzinfo=datetime.timezone.utc).timestamp()
+                                * 10 ** 3
+                            ),
+                        )
+                    elif spec["option_id"] in (OptionID.TIMEUUID, OptionID.UUID):
+                        # what about buffer
+                        if not isinstance(value, uuid.UUID):
+                            raise BadInputException(
+                                f"expected type=uuid.UUID but got type={pretty_type(value)} for value={value!r}"
+                            )
+                        if (
+                            spec["option_id"] == OptionID.TIMEUUID
+                            and value.version != 1
+                        ):
+                            raise BadInputException(
+                                f"value for type={spec['option_id']} is not UUID version 1, but version={value.version}"
+                            )
+                        body += pack(
+                            f"{NETWORK_ORDER}{STypes.INT}", 16
+                        ) + value.int.to_bytes(length=16, byteorder="big")
 
                     elif spec["option_id"] in (OptionID.BOOLEAN,):
                         # what about buffer
@@ -929,7 +1035,9 @@ class QueryMessage(RequestMessage):
                                 f"expected type=bool but got type={pretty_type(value)} for value={value!r}"
                             )
                         body += pack(
-                            f"{NETWORK_ORDER}{STypes.INT}{STypes.INT}", 4, (0, 1)[value]
+                            f"{NETWORK_ORDER}{STypes.INT}{STypes.BYTE}",
+                            1,
+                            (0, 1)[value],
                         )
 
                     elif spec["option_id"] in (OptionID.ASCII, OptionID.VARCHAR):
@@ -938,9 +1046,51 @@ class QueryMessage(RequestMessage):
                                 f"expected type=str but got type={pretty_type(value)} for value={value!r}"
                             )
                         body += encode_long_string(value)
+                    elif spec["option_id"] in (OptionID.DOUBLE,):
+                        if not isinstance(value, float):
+                            raise BadInputException(
+                                f"expected type=float but got type={pretty_type(value)} for value={value!r}"
+                            )
+                        encoded = pack(f"{NETWORK_ORDER}{STypes.DOUBLE}", value)
+                        body += encode_int(len(encoded)) + encoded
+                    elif spec["option_id"] in (OptionID.FLOAT,):
+                        if not isinstance(value, float):
+                            raise BadInputException(
+                                f"expected type=float but got type={pretty_type(value)} for value={value!r}"
+                            )
+                        encoded = pack(f"{NETWORK_ORDER}{STypes.FLOAT}", value)
+                        body += encode_int(len(encoded)) + encoded
+
+                    elif spec["option_id"] in (OptionID.INET,):
+                        if not isinstance(
+                            value, ipaddress.IPv4Address
+                        ) and not isinstance(value, ipaddress.IPv6Address):
+                            raise BadInputException(
+                                f"expected type=ipaddress.IPv4Address/ipaddress.IPv6Address but got "
+                                + "type={pretty_type(value)} for value={value!r}"
+                            )
+                        length = (4, 16)[value.version == 6]
+                        body += encode_int(length)
+                        body += int(value).to_bytes(
+                            length, byteorder="big", signed=True
+                        )
+                    elif spec["option_id"] in (OptionID.DECIMAL,):
+                        if not isinstance(value, decimal.Decimal):
+                            raise BadInputException(
+                                f"expected type=decimal.Decimal but got type={pretty_type(value)} for value={value!r}"
+                            )
+                        scale = encode_int(-1 * value.as_tuple().exponent)
+                        unscaled = encode_varint(
+                            sum(
+                                10 ** c * d
+                                for c, d in enumerate(reversed(value.as_tuple().digits))
+                            )
+                        )
+                        print(f"scale={scale!r} unscaled={unscaled!r}")
+                        body += encode_int(len(scale + unscaled)) + scale + unscaled
                     else:
                         raise InternalDriverError(
-                            f"cannot handle unknown option_id={spec['option_id']}"
+                            f"cannot handle unknown option_id=0x{spec['option_id']:x}"
                         )
             else:
                 if isinstance(query_params, dict):

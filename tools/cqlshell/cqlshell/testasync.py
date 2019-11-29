@@ -2,7 +2,11 @@
 
 import argparse
 import asyncio
+import datetime
+import decimal
+import ipaddress
 import sys
+import uuid
 from signal import Signals
 
 import pysandra
@@ -217,7 +221,29 @@ async def test_types(tester):
         "INSERT INTO  uprofile.alltypes  (myascii, mybigint, myblob, myboolean, mydate, mydecimal, mydouble, "
         + "myfloat, myinet, myint, mysmallint, mytext, mytime, mytimestamp, mytimeuuid, mytinyint, myuuid, "
         + "myvarchar, myvarint) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-        [["1", 2, b"3", True, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]],
+        [
+            [
+                "1",
+                2,
+                b"\x03\x06",
+                False,
+                datetime.date.today(),
+                decimal.Decimal("600.12315455"),  # fix
+                7.123344,
+                8.344455999,
+                ipaddress.IPv6Address("2607:f8b0:4006:813::200e"),
+                10,
+                11,
+                "12",
+                13,
+                datetime.datetime.now(),
+                uuid.UUID("769280c8-12f0-11ea-8899-60a44ce97462"),
+                16,
+                uuid.UUID("f92630a6-d994-440e-a2dc-fe6b28e93829"),
+                "18",
+                19,
+            ]
+        ],
         consistency=pysandra.Consistency.ONE,
     )
 

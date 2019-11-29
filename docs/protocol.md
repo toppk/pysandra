@@ -175,3 +175,5 @@ What is the correct CQL_VERSION (sec. 4.1.1).  If you send options first, what p
 * when is global_tables_spec not sent?
 
 * fault injection?
+
+* 6.6   varint encoding (see section 6.17), actually 6.23
