@@ -995,7 +995,13 @@ class QueryMessage(RequestMessage):
                         body += pack(
                             f"{NETWORK_ORDER}{STypes.INT}{STypes.UINT}",
                             4,
-                            (value - datetime.date.fromtimestamp(0)).days + 2 ** 31,
+                            (
+                                value
+                                - datetime.datetime.fromtimestamp(
+                                    0, datetime.timezone.utc
+                                ).date()
+                            ).days
+                            + 2 ** 31,
                         )
                     elif spec["option_id"] in (OptionID.TIMESTAMP,):
                         # what about buffer

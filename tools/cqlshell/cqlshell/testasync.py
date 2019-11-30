@@ -227,7 +227,7 @@ async def test_types(tester):
                 2,
                 b"\x03\x06",
                 False,
-                datetime.date.today(),
+                datetime.date(2019, 11, 29),
                 decimal.Decimal("600.12315455"),  # fix
                 7.123344,
                 8.344455999,
