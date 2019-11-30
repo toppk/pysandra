@@ -246,6 +246,7 @@ async def test_types(tester):
         ],
         consistency=pysandra.Consistency.ONE,
     )
+    await tester.run_query(" SELECT * FROM uprofile.alltypes", send_metadata=True)
 
 
 async def test_ddl(tester):

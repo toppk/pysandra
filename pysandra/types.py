@@ -1,6 +1,9 @@
+import datetime  # noqa: F401
+import decimal  # noqa: F401
+import ipaddress  # noqa: F401
+import uuid  # noqa: F401
 from asyncio import Queue  # noqa
 from collections import OrderedDict
-from ipaddress import IPv4Address, IPv6Address  # noqa: F401
 from typing import (  # noqa
     Any,
     Callable,
@@ -26,6 +29,22 @@ ExpectedResponses = Union[
     str, bool, "Rows", bytes, "SchemaChange", "Queue[Any]", Dict[str, List[str]]
 ]
 
+ExpectedType = Optional[
+    Union[
+        bytes,
+        str,
+        int,
+        float,
+        bool,
+        "uuid.UUID",
+        "decimal.Decimal",
+        "ipaddress.IPv4Address",
+        "ipaddress.IPv6Address",
+        "datetime.date",
+        "datetime.datetime",
+    ]
+]
+
 
 class BaseType:
     pass
@@ -41,9 +60,11 @@ class AsciiType(BaseType):
 
 class InetType(BaseType):
     def __init__(
-        self, ipaddress: Union["IPv4Address", "IPv6Address"], port: int
+        self,
+        ipaddr: Union["ipaddress.IPv4Address", "ipaddress.IPv6Address"],
+        port: int,
     ) -> None:
-        self.ipaddress = ipaddress
+        self.ipaddr = ipaddress
         self.port = port
 
 
@@ -76,7 +97,7 @@ class SchemaChange(ChangeEvent):
 
 
 class Row:
-    def __init__(self, *args: Any, fields: List[str]) -> None:
+    def __init__(self, *args: "ExpectedType", fields: List[str]) -> None:
         self.args = args
         self.fields = fields
 
@@ -91,7 +112,7 @@ class Row:
     def __iter__(self) -> Iterator[Any]:
         return self.args.__iter__()
 
-    def __getattr__(self, name: str) -> str:
+    def __getattr__(self, name: str) -> "ExpectedType":
         return self.args[self.fields.index(name)]
 
     def __dir__(self) -> List[str]:
@@ -100,7 +121,7 @@ class Row:
         ] + self.fields
 
     # return self.fields
-    def __getitem__(self, index: int) -> Optional[bytes]:
+    def __getitem__(self, index: int) -> "ExpectedType":
         return self.args[index]
 
     def asdict_(self) -> "OrderedDict":
@@ -116,7 +137,7 @@ class Rows:
         self, columns_count: int, col_specs: Optional[List[Dict[str, Any]]] = None
     ) -> None:
         self.index: int = 0
-        self._data: List[Union["Row", Tuple[Optional[bytes], ...]]] = []
+        self._data: List[Union["Row", Tuple["ExpectedType", ...]]] = []
         self.columns_count = columns_count
         self._col_specs: Optional[List[Dict[str, Any]]] = None
         self._fields: Optional[List[str]] = None
@@ -126,7 +147,7 @@ class Rows:
     def __iter__(self) -> "Rows":
         return self
 
-    def __getitem__(self, index: int) -> Union["Row", Tuple[Optional[bytes], ...]]:
+    def __getitem__(self, index: int) -> Union["Row", Tuple["ExpectedType", ...]]:
         return self._data[index]
 
     def __len__(self) -> int:
@@ -148,13 +169,13 @@ class Rows:
             for row in rows:
                 self._data.append(row)
 
-    def add_row(self, row: Tuple[Optional[bytes], ...]) -> None:
+    def add_row(self, row: Tuple["ExpectedType", ...]) -> None:
         if self._fields is not None:
             self._data.append(Row(*row, fields=self._fields))
         else:
             self._data.append(row)
 
-    def __next__(self) -> Union["Row", Tuple[Optional[bytes], ...]]:
+    def __next__(self) -> Union["Row", Tuple["ExpectedType", ...]]:
         if self.index == len(self._data):
             # reset
             self.index = 0

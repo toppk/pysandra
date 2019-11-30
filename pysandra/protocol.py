@@ -33,6 +33,7 @@ from .exceptions import (
     UnknownPayloadException,
     VersionMismatchException,
 )
+from .types import ExpectedType  # noqa: F401
 from .types import (
     ChangeEvent,
     ExpectedResponses,
@@ -225,6 +226,15 @@ def decode_length_bytes(sbytes: "SBytes", length: int) -> bytes:
     assert length is not None
     if length == 0:
         return b""
+    return unpack(f"{NETWORK_ORDER}{length}{STypes.CHAR}", sbytes.grab(length))[0]
+
+
+def decode_int_bytes_must(sbytes: "SBytes") -> bytes:
+    length = decode_int(sbytes)
+    if length == 0:
+        return b""
+    elif length < 0:
+        raise InternalDriverError(f"unexpected negative length")
     return unpack(f"{NETWORK_ORDER}{length}{STypes.CHAR}", sbytes.grab(length))[0]
 
 
@@ -682,9 +692,80 @@ class ResultMessage(ResponseMessage):
             rows = Rows(columns_count, col_specs=col_specs)
             rows_count = decode_int(body)
             for _rowcnt in range(rows_count):
-                row: List[Optional[bytes]] = []
-                for _colcnt in range(columns_count):
-                    row.append(decode_int_bytes(body))
+                row: List[Optional["ExpectedType"]] = []
+                for colcnt in range(columns_count):
+                    cell: Optional["ExpectedType"] = None
+                    value = SBytes(decode_int_bytes_must(body))
+                    if col_specs is None:
+                        row.append(bytes(value))
+                    else:
+                        spec = col_specs[colcnt]
+                        if spec["option_id"] in (
+                            OptionID.INT,
+                            OptionID.BIGINT,
+                            OptionID.SMALLINT,
+                            OptionID.TIME,
+                            OptionID.TINYINT,
+                            OptionID.VARINT,
+                        ):
+                            cell = int.from_bytes(value, byteorder="big", signed=True)
+                        elif spec["option_id"] in (OptionID.BLOB,):
+                            cell = value
+                        elif spec["option_id"] in (OptionID.ASCII, OptionID.VARCHAR):
+                            cell = value.decode("utf-8")
+                        elif spec["option_id"] in (OptionID.DECIMAL,):
+                            scale = decode_int(value)
+                            unscaled = int.from_bytes(
+                                value.remaining, byteorder="big", signed=True
+                            )
+                            cell = decimal.Decimal(unscaled) * 10 ** (
+                                -1 * decimal.Decimal(scale)
+                            )
+                        elif spec["option_id"] in (OptionID.DOUBLE,):
+                            cell = unpack(f"{NETWORK_ORDER}{STypes.DOUBLE}", value)[0]
+                        elif spec["option_id"] in (OptionID.FLOAT,):
+                            cell = unpack(f"{NETWORK_ORDER}{STypes.FLOAT}", value)[0]
+                        elif spec["option_id"] in (OptionID.INET,):
+                            ipaddr = int.from_bytes(
+                                value.remaining, byteorder="big", signed=False
+                            )
+                            if len(value) not in (4, 16,):
+                                raise InternalDriverError(
+                                    f"option={spec['option_id']:x} not exepected length 4 or 16, length={len(value)}"
+                                )
+                            cell = (
+                                ipaddress.IPv4Address(ipaddr)
+                                if len(value) == 4
+                                else ipaddress.IPv6Address(ipaddr)
+                            )
+                        elif spec["option_id"] in (OptionID.TIMEUUID, OptionID.UUID):
+                            uuidint = int.from_bytes(
+                                value.remaining, byteorder="big", signed=False
+                            )
+                            cell = uuid.UUID(int=uuidint)
+                        elif spec["option_id"] in (OptionID.BOOLEAN,):
+                            cell = False if value == b"\x00" else True
+                        elif spec["option_id"] in (OptionID.TIMESTAMP,):
+                            timestamp = int.from_bytes(
+                                value, byteorder="big", signed=False
+                            )
+                            # logger.debug(f"date={date} pathma={date-2**31} value={value!r}")
+                            cell = datetime.datetime.fromtimestamp(
+                                timestamp / 10 ** 3, datetime.timezone.utc
+                            )
+                        elif spec["option_id"] in (OptionID.DATE,):
+                            date = int.from_bytes(value, byteorder="big", signed=False)
+                            # logger.debug(f"date={date} pathma={date-2**31} value={value!r}")
+                            cell = datetime.datetime.fromtimestamp(
+                                0, datetime.timezone.utc
+                            ).date() + datetime.timedelta(days=date - 2 ** 31)
+                        else:
+                            raise InternalDriverError(
+                                f"unknown option_id={spec['option_id']:x} with value={value!r}"
+                            )
+                        # logger.debug(f"got cell={cell} with option_id={spec['option_id']:x} for value={value} with type={type(cell)}")
+                        row.append(cell)
+
                 rows.add_row(tuple(row))
             logger.debug(f"got col_specs={col_specs}")
             msg = RowsResultMessage(rows, kind, version, flags, stream_id)
