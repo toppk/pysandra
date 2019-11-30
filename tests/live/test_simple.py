@@ -23,7 +23,7 @@ async def test_connected(client):
 @pytest.mark.asyncio
 async def test_simple_query(client):
     query = "SELECT release_version FROM system.local"
-    resp = await client.execute(query)
+    resp = await client.execute(query, send_metadata=False)
 
     assert list(resp)[0][0] == b"3.11.5"
 
@@ -33,7 +33,7 @@ async def test_simple_query(client):
 @pytest.mark.asyncio
 async def test_simple_query_with_args(client):
     query = "SELECT * FROM uprofile.user where user_id=?"
-    resp = await client.execute(query, (2,))
+    resp = await client.execute(query, (2,), send_metadata=False)
 
     assert list(resp)[0][2] == b"Dubai"
 
@@ -43,7 +43,7 @@ async def test_simple_query_with_args(client):
 @pytest.mark.asyncio
 async def test_simple_query_with_namedargs(client):
     query = "SELECT * FROM uprofile.user where user_id=:id"
-    resp = await client.execute(query, {"id": 2})
+    resp = await client.execute(query, {"id": 2}, send_metadata=False)
 
     assert list(resp)[0][2] == b"Dubai"
 
@@ -53,7 +53,7 @@ async def test_simple_query_with_namedargs(client):
 @pytest.mark.asyncio
 async def test_simple_query_with_filtering(client):
     query = "SELECT * FROM uprofile.user where user_bcity='Dubai' ALLOW FILTERING"
-    resp = await client.execute(query)
+    resp = await client.execute(query, send_metadata=False)
 
     assert list(resp)[0][0] == b"\x00\x00\x00\x02"
 
@@ -66,7 +66,7 @@ async def test_simple_query_needs_filtering(client):
         ServerError, match=r"error_code=0x2200.*might involve data filtering"
     ):
         query = "SELECT * FROM uprofile.user where user_bcity='Dubai'"
-        await client.execute(query)
+        await client.execute(query, send_metadata=False)
 
 
 @pytest.mark.live
@@ -77,7 +77,7 @@ async def test_simple_query_no_keyspace(client):
         ServerError, match=r"error_code=0x2200.*No keyspace has been specified"
     ):
         query = "SELECT * FROM user where user_id=3"
-        await client.execute(query)
+        await client.execute(query, send_metadata=False)
 
 
 @pytest.mark.live
@@ -85,8 +85,8 @@ async def test_simple_query_no_keyspace(client):
 @pytest.mark.asyncio
 async def test_simple_query_use_keyspace(client):
     query = "SELECT * FROM user where user_id=3"
-    await client.execute("use uprofile")
-    resp = await client.execute(query)
+    await client.execute("use uprofile", send_metadata=False)
+    resp = await client.execute(query, send_metadata=False)
     assert list(resp)[0][2] == b"Chennai"
 
 
@@ -98,7 +98,7 @@ async def test_simple_bad_prepare(client):
         prepare = "INSERT INTO  uprofile.user  (user_id, user_name , user_bcity) VALUES (?,?,?)"
         stmt_id = await client.prepare(prepare)
         data = ["hillary", 2, "Washington D.C."]
-        await client.execute(stmt_id, data)
+        await client.execute(stmt_id, data, send_metadata=False)
 
 
 @pytest.mark.live
@@ -109,7 +109,7 @@ async def test_simple_bad_prepare_str(client):
         prepare = "INSERT INTO  uprofile.user  (user_id, user_name , user_bcity) VALUES (?,?,?)"
         stmt_id = await client.prepare(prepare)
         data = ["hillary", 2, "Washington D.C."]
-        await client.execute(stmt_id, data)
+        await client.execute(stmt_id, data, send_metadata=False)
 
 
 @pytest.mark.live
@@ -120,7 +120,7 @@ async def test_simple_bad_prepare_int(client):
         prepare = "INSERT INTO  uprofile.user  (user_id, user_name , user_bcity) VALUES (?,?,?)"
         stmt_id = await client.prepare(prepare)
         data = [4, 2, "Washington D.C."]
-        await client.execute(stmt_id, data)
+        await client.execute(stmt_id, data, send_metadata=False)
 
 
 @pytest.mark.live
@@ -131,7 +131,7 @@ async def test_simple_bad_data_query_server(client):
         ServerError, match=r"error_code=0x2200.*Invalid STRING constant.*of type int"
     ):
         query = "INSERT INTO  uprofile.user  (user_id, user_name , user_bcity) VALUES ('hillary', 2, 'DC')"
-        await client.execute(query)
+        await client.execute(query, send_metadata=False)
 
 
 @pytest.mark.live
@@ -143,7 +143,7 @@ async def test_simple_bad_data_query_bound(client):
     ):
         query = "INSERT INTO  uprofile.user  (user_id, user_name , user_bcity) VALUES (?,?,?)"
         data = ("hillary", "not", "DC")
-        await client.execute(query, data)
+        await client.execute(query, data, send_metadata=False)
 
 
 @pytest.mark.live
@@ -155,7 +155,7 @@ async def test_simple_bad_data_query_namedbound(client):
     ):
         query = "INSERT INTO  uprofile.user  (user_id, user_name , user_bcity) VALUES (:id,:name,:city)"
         data = {"name": 666, "id": "hillary", "city": "DC"}
-        await client.execute(query, data)
+        await client.execute(query, data, send_metadata=False)
 
 
 @pytest.mark.live
@@ -172,7 +172,7 @@ async def test_meta_query(client):
 @pytest.mark.asyncio
 async def test_meta_query_none(client):
     query = "SELECT release_version FROM system.local"
-    resp = await client.execute(query)
+    resp = await client.execute(query, send_metadata=False)
     assert resp.col_specs is None
 
 
@@ -227,9 +227,9 @@ async def test_meta_query_nouse(client):
 async def test_meta_schema_events(client):
     queue = await client.register([Events.SCHEMA_CHANGE])
     query = "CREATE KEYSPACE IF NOT EXISTS testkeyspace WITH replication = {'class': 'NetworkTopologyStrategy', 'datacenter1' : '1' }"
-    await client.execute(query)
+    await client.execute(query, send_metadata=False)
     query = "DROP KEYSPACE testkeyspace"
-    await client.execute(query)
+    await client.execute(query, send_metadata=False)
     assert queue.get_nowait().options["target_name"] == "testkeyspace"
 
 
@@ -242,7 +242,7 @@ async def test_results_error_unavailable(client):
         match=r"received error_code=0x1000.*Cannot achieve consistency level THREE",
     ):
         query = "INSERT INTO  uprofile.user  (user_id, user_name , user_bcity) VALUES (45, 'Trump', 'Washington D.C.')"
-        await client.execute(query, consistency=Consistency.THREE)
+        await client.execute(query, consistency=Consistency.THREE, send_metadata=False)
 
 
 @pytest.mark.live
@@ -250,5 +250,7 @@ async def test_results_error_unavailable(client):
 @pytest.mark.asyncio
 async def test_live_simple_use_keyspace(client):
     query = "use uprofile"
-    resp = await client.execute(query, consistency=Consistency.THREE)
+    resp = await client.execute(
+        query, consistency=Consistency.THREE, send_metadata=False
+    )
     assert resp == "uprofile"

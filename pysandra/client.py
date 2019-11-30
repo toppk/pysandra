@@ -124,7 +124,7 @@ class Client:
         self,
         stmt: str,
         args: Optional[Iterable] = None,
-        send_metadata: bool = False,
+        send_metadata: bool = True,  # growing up
         consistency: "Consistency" = None,
     ) -> "ExpectedResponses":
         logger.debug(f" in execte got args={args}")
