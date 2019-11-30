@@ -1,8 +1,14 @@
+import datetime
+import decimal
+import ipaddress
+import uuid
+
 import pytest
 
 from pysandra import constants, exceptions, messages
 from pysandra.constants import Consistency, Events, Opcode, SchemaChangeTarget
 from pysandra.core import SBytes
+from pysandra.types import Row
 
 
 def test_messages_response_create_bad():
@@ -256,11 +262,49 @@ def test_messages_register_bad():
         msg.encode_body()
 
 
+def test_messages_rowresults_alltypes():
+    body = (
+        b"\x00\x00\x00\x02\x00\x00\x00\x01\x00\x00\x00\x13\x00\x08uprofile\x00\x08"
+        + b"alltypes\x00\x05myint\x00\t\x00\x07myascii\x00\x01\x00\x08mybigint\x00\x02\x00"
+        + b"\x06myblob\x00\x03\x00\tmyboolean\x00\x04\x00\x06mydate\x00\x11\x00\tmydecimal"
+        + b"\x00\x06\x00\x08mydouble\x00\x07\x00\x07myfloat\x00\x08\x00\x06myinet\x00\x10"
+        + b"\x00\nmysmallint\x00\x13\x00\x06mytext\x00\r\x00\x06mytime\x00\x12\x00\x0b"
+        + b"mytimestamp\x00\x0b\x00\nmytimeuuid\x00\x0f\x00\tmytinyint\x00\x14\x00\x06myuuid"
+        + b"\x00\x0c\x00\tmyvarchar\x00\r\x00\x08myvarint\x00\x0e\x00\x00\x00\x01\x00\x00\x00"
+        + b"\x04\x00\x00\x00\n\x00\x00\x00\x011\x00\x00\x00\x08\x00\x00\x00\x00\x00\x00\x00"
+        + b"\x02\x00\x00\x00\x02\x03\x06\x00\x00\x00\x01\x00\x00\x00\x00\x04\x80\x00G5\x00"
+        + b"\x00\x00\t\x00\x00\x00\x08\r\xf9\x03C?\x00\x00\x00\x08@\x1c~M\xe3\xb8\xa1\x9d\x00"
+        + b"\x00\x00\x04A\x05\x82\xe4\x00\x00\x00\x10&\x07\xf8\xb0@\x06\x08\x13\x00\x00\x00"
+        + b"\x00\x00\x00 \x0e\x00\x00\x00\x02\x00\x0b\x00\x00\x00\x0212\x00\x00\x00\x08\x00"
+        + b"\x00\x00\x00\x00\x00\x00\r\x00\x00\x00\x08\x00\x00\x01n\xb8@\xa3\x1b\x00\x00\x00"
+        + b"\x10v\x92\x80\xc8\x12\xf0\x11\xea\x88\x99`\xa4L\xe9tb\x00\x00\x00\x01\x10\x00\x00"
+        + b"\x00\x10\xf9&0\xa6\xd9\x94D\x0e\xa2\xdc\xfek(\xe98)\x00\x00\x00\x0218\x00\x00\x00\x01\x13"
+    )
+    msg = messages.ResultMessage.build(1, 2, 3, SBytes(body),)
+    assert msg.rows[0] == Row(
+        myint=10,
+        myascii="1",
+        mybigint=2,
+        myblob=b"\x03\x06",
+        myboolean=False,
+        mydate=datetime.date(2019, 11, 29),
+        mydecimal=decimal.Decimal("600.12315455"),
+        mydouble=7.123344,
+        myfloat=8.34445571899414,
+        myinet=ipaddress.IPv6Address("2607:f8b0:4006:813::200e"),
+        mysmallint=11,
+        mytext="12",
+        mytime=13,
+        mytimestamp=datetime.datetime(2019, 11, 29, 17, 41, 14, 139000),
+        mytimeuuid=uuid.UUID("769280c8-12f0-11ea-8899-60a44ce97462"),
+        mytinyint=16,
+        myuuid=uuid.UUID("f92630a6-d994-440e-a2dc-fe6b28e93829"),
+        myvarchar="18",
+        myvarint=19,
+    )
+
+
 def test_messages_execute_alltypes():
-    import datetime
-    import decimal
-    import ipaddress
-    import uuid
 
     expected_body = (
         b"\x00\x10W\xa5g\xe7\xd3r'\xc1\x85\xf7\x06}<\xc3\xadp\x00\x01\x03\x00\x13\x00"

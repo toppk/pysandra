@@ -1,3 +1,4 @@
+from collections import OrderedDict
 from ipaddress import IPv4Address
 
 from pysandra import types
@@ -41,6 +42,11 @@ def test_types_rows_specs_cont():
     d.add_row((b"1", b"2"))
     d.add_row((b"3", b"4"))
     assert list(d)[1].two == b"4"
+
+
+def test_types_rows_specs_property():
+    d = types.Rows(2, col_specs=[{"name": "one"}, {"name": "two"}])
+    assert len(d.col_specs) == 2
 
 
 def test_types_rows_specs_b4():
@@ -88,12 +94,12 @@ def test_types_rows_specs_repr():
 
 
 def test_types_row_specs_dict():
-    d = types.Row(1, 2, 3, fields=["a", "b", "c"])
+    d = types.Row(1, 2, 3, fields_=["a", "b", "c"])
     assert dict(d.asdict_()) == {"a": 1, "b": 2, "c": 3}
 
 
 def test_types_row_specs_iter():
-    d = types.Row(1, 2, 3, fields=["a", "b", "c"])
+    d = types.Row(1, 2, 3, fields_=["a", "b", "c"])
     cnt = 0
     for _ele in d:
         cnt += 1
@@ -101,17 +107,66 @@ def test_types_row_specs_iter():
 
 
 def test_types_row_specs_item():
-    d = types.Row(1, 2, 3, fields=["a", "b", "c"])
+    d = types.Row(1, 2, 3, fields_=["a", "b", "c"])
     assert d[2] == 3
 
 
+def test_types_row_specs_asdict_index():
+    data = OrderedDict()
+    data["a"] = 1
+    data["b"] = 2
+    data["c"] = 3
+
+    d = types.Row(**data)
+    assert d[2] == 3
+
+
+def test_types_row_specs_asdict_attr():
+    data = OrderedDict()
+    data["a"] = 1
+    data["b"] = 2
+    data["c"] = 3
+
+    d = types.Row(**data)
+    assert d.b == 2
+
+
+def test_types_row_specs_getattr():
+    data = OrderedDict()
+    data["a"] = 1
+    data["b"] = 2
+    data["c"] = 3
+
+    d = types.Row(**data)
+    assert getattr(d, "foo", None) is None
+
+
+def test_types_row_specs_eq2():
+    data = OrderedDict()
+    data["a"] = 1
+    data["b"] = 2
+    data["c"] = 3
+
+    d = types.Row(**data)
+    g = types.Row(1, 2, 3, fields_=["a", "b", "c"])
+    assert d == g
+
+
+def test_types_row_specs_eq2_bad():
+    from uuid import uuid4
+
+    d = uuid4()
+    g = types.Row(1, 2, 3, fields_=["a", "b", "c"])
+    assert d != g
+
+
 def test_types_row_specs_len():
-    d = types.Row(b"1", b"2", fields=["a", "b"])
+    d = types.Row(b"1", b"2", fields_=["a", "b"])
     assert len(d) == 2
 
 
 def test_types_row_specs_dir():
-    d = types.Row(b"1", b"2", fields=["a", "b"])
+    d = types.Row(b"1", b"2", fields_=["a", "b"])
     assert "args" not in dir(d) and "a" in dir(d)
 
 

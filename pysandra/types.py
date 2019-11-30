@@ -109,35 +109,56 @@ class SchemaChange(ChangeEvent):
 
 
 class Row:
-    def __init__(self, *args: "ExpectedType", fields: List[str]) -> None:
-        self.args = args
-        self.fields = fields
+    def __init__(
+        self,
+        *args: "ExpectedType",
+        fields_: Optional[List[str]] = None,
+        **kwargs: "ExpectedType",
+    ) -> None:
+        if fields_ is not None and len(args) > 0:
+            self._args = args
+            self._fields = fields_
+        else:
+            self._args = tuple(kwargs.values())
+            self._fields = list(kwargs.keys())
 
     def __repr__(self) -> str:
         return self.__class__.__name__ + "(%s)" % ", ".join(
-            [f"{k}={v!r}" for k, v in zip(self.fields, self.args)]
+            [f"{k}={v!r}" for k, v in zip(self._fields, self._args)]
+        )
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Row):
+            return NotImplemented
+        return (
+            self.__class__ == other.__class__
+            and self._args == other._args
+            and self._fields == other._fields
         )
 
     def __len__(self) -> int:
-        return len(self.args)
+        return len(self._args)
 
     def __iter__(self) -> Iterator[Any]:
-        return self.args.__iter__()
+        return self._args.__iter__()
 
     def __getattr__(self, name: str) -> "ExpectedType":
-        return self.args[self.fields.index(name)]
+        try:
+            return self._args[self._fields.index(name)]
+        except ValueError:
+            raise AttributeError
 
     def __dir__(self) -> List[str]:
         return [
-            x for x in super().__dir__() if x not in ("args", "fields")
-        ] + self.fields
+            x for x in super().__dir__() if x not in ("_args", "_fields")
+        ] + self._fields
 
     # return self.fields
     def __getitem__(self, index: int) -> "ExpectedType":
-        return self.args[index]
+        return self._args[index]
 
     def asdict_(self) -> "OrderedDict":
-        return OrderedDict(zip(self.fields, self.args))
+        return OrderedDict(zip(self._fields, self._args))
 
 
 class Rows:
@@ -176,14 +197,14 @@ class Rows:
         if len(self._data) > 0:
             rows = []
             for row in self._data:
-                rows.append(Row(*row, fields=self._fields))
+                rows.append(Row(*row, fields_=self._fields))
             self._data.clear()
             for row in rows:
                 self._data.append(row)
 
     def add_row(self, row: Tuple["ExpectedType", ...]) -> None:
         if self._fields is not None:
-            self._data.append(Row(*row, fields=self._fields))
+            self._data.append(Row(*row, fields_=self._fields))
         else:
             self._data.append(row)
 

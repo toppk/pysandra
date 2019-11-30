@@ -1,4 +1,8 @@
 import asyncio
+import datetime
+import decimal
+import ipaddress
+import uuid
 
 import pytest
 
@@ -54,6 +58,46 @@ async def setup_db(client=None, close=False):
     await client.execute(insert_data, [3, "Keviv", "Chennai"])
     await client.execute(insert_data, [4, "Ehtevs", "Pune"])
     await client.execute(insert_data, [5, "Dnivog", "Belgaum"])
+    await client.execute(
+        "CREATE TABLE uprofile.alltypes (myascii ascii, mybigint bigint, myblob blob, myboolean boolean, "
+        + "mydate date, mydecimal decimal, mydouble double, myfloat float, myinet inet, myint int, mysmallint smallint, "
+        + "mytext text, mytime time, mytimestamp timestamp, mytimeuuid timeuuid, mytinyint tinyint, myuuid uuid, "
+        + "myvarchar varchar, myvarint varint, PRIMARY KEY( myint))"
+    )
+    await client.execute(
+        "CREATE TABLE uprofile.countertypes (myascii ascii, mybigint bigint,  mycounter1 counter, "
+        + "mycounter2 counter, PRIMARY KEY(myascii, mybigint))"
+    )
+    insert_data = await client.prepare(
+        "INSERT INTO  uprofile.alltypes  (myascii, mybigint, myblob, myboolean, mydate, mydecimal, mydouble, "
+        + "myfloat, myinet, myint, mysmallint, mytext, mytime, mytimestamp, mytimeuuid, mytinyint, myuuid, "
+        + "myvarchar, myvarint) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+    )
+    await client.execute(
+        insert_data,
+        [
+            "1",
+            2,
+            b"\x03\x06",
+            False,
+            datetime.date(2019, 11, 29),
+            decimal.Decimal("600.12315455"),  # fix
+            7.123344,
+            8.344455999,
+            ipaddress.IPv6Address("2607:f8b0:4006:813::200e"),
+            10,
+            11,
+            "12",
+            13,
+            datetime.datetime(2019, 11, 29, 17, 41, 14, 138904),
+            uuid.UUID("769280c8-12f0-11ea-8899-60a44ce97462"),
+            16,
+            uuid.UUID("f92630a6-d994-440e-a2dc-fe6b28e93829"),
+            "18",
+            19,
+        ],
+    )
+
     print(f"in setup_db client={client.is_connected}")
     if close:
         await client.close()
