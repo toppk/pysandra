@@ -1,6 +1,6 @@
 ## NOTICE
 
-This project has just started.  In order to get the SDLC complete, this project is published on github and pypi, but I don't recommend anyone use it just yet.
+This project has recently started.  I don't recommend anyone use it just yet.
 
 However, it is for anyone who wants
 
@@ -29,18 +29,22 @@ In case you didn't read the notice, there's quite a limited set of functionality
 Things that exist:
 
 * asyncio interface
-* basic DML query (all results are just bytes at the moment)
+* basic query support (with results into native python types)
+* basic DML support
 * basic DDL query
 * basic prepared statements
+* basic TLS support
 * ...
 * see protocol.md for more details
 
 Things that don't exist:
-* any authnetication support
-* any connection support other then localhost :)
+
+* any authentication support
 * sync support (version 2.0)
-* full error handling
-* results into native python types
+* paging, batch support
+* stable api
+* friendly api
+* connection to more then one cluster member
 * ...
 * why are you still reading this.
 
@@ -63,12 +67,12 @@ Aims to be:
 
 ## Todos
 
-* get real data
+* tls context
 * paging
 * AUTH
 * Tests
 * api docs
-* make user objects user friendly (exceptions, EventChage, Rows)
+* make user objects user friendly (exceptions, EventChange, Rows)
 * batch
 * client connection routing
 * cqlshell

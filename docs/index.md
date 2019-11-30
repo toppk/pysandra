@@ -1,6 +1,5 @@
 !!! warning
-     This project has just started.  In order to get the SDLC complete, this project is published on
-     github and pypi, but I don't recommend anyone use it just yet.
+     This project has recently started.  I don't recommend anyone use it just yet.
 
      However, it is for anyone who wants to get involved in development, to give feedback,
      or are happy with it's very limited state.
@@ -49,19 +48,22 @@ In case you didn't read the notice, there's quite a limited set of functionality
 Things that exist:
 
 * asyncio interface
-* basic DML query (all results are just bytes at the moment)
+* basic query support (with results into native python types)
+* basic DML support
 * basic DDL query
 * basic prepared statements
+* basic TLS support
 * ...
 * see protocol.md for more details
 
 Things that don't exist:
 
-* any authnetication support
-* any connection support other then localhost :)
+* any authentication support
 * sync support (version 2.0)
-* full error handling
-* results into native python types
+* paging, batch support
+* stable api
+* friendly api
+* connection to more then one cluster member
 * ...
 * why are you still reading this.
 
@@ -70,7 +72,6 @@ Things that don't exist:
 
 * cassandra client driver for asyncio based applications
 * allow doing anything the wire protocol allows and servers tolerate
-
 
 
 ## License & Contributions

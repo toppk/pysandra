@@ -24,24 +24,24 @@
       4.1.7. BATCH - not done
       4.1.8. REGISTER - partial
     4.2. Responses - partial
-      4.2.1. ERROR - partial
+      4.2.1. ERROR - mostly (not all tested)
       4.2.2. READY - done
       4.2.3. AUTHENTICATE - not done
       4.2.4. SUPPORTED - done (see notes below)
-      4.2.5. RESULT - partial 
+      4.2.5. RESULT - mostly
         4.2.5.1. Void - done
         4.2.5.2. Rows - done
         4.2.5.3. Set_keyspace - done
         4.2.5.4. Prepared - done
         4.2.5.5. Schema_change - done
-      4.2.6. EVENT - partial
+      4.2.6. EVENT - mostly (not all tested)
       4.2.7. AUTH_CHALLENGE - not done
       4.2.8. AUTH_SUCCESS - not done
   5. Compression - done
   6. Data Type Serialization Formats - not done
   7. User Defined Type Serialization - not done
   8. Result paging - not done
-  9. Error codes - not done
+  9. Error codes - mostly (not all tested)
   10. Changes from v3 - ignored
 ```
 
