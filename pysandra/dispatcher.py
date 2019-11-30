@@ -4,7 +4,8 @@ from typing import Callable, Dict, Optional, Tuple, Union
 from .constants import EVENT_STREAM_ID, Flags
 from .core import Streams
 from .exceptions import InternalDriverError, ServerError
-from .protocol import ErrorMessage, Protocol, RequestMessage  # noqa: F401
+from .messages import ErrorMessage, RequestMessage  # noqa: F401
+from .protocol import Protocol  # noqa: F401
 from .types import ExpectedResponses  # noqa: F401
 from .utils import get_logger
 

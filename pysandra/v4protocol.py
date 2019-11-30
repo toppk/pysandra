@@ -5,14 +5,13 @@ from .constants import EVENTS_QUEUE_MAXSIZE, Opcode
 from .core import SBytes
 from .exceptions import ServerError  # noqa: F401
 from .exceptions import InternalDriverError, UnknownPayloadException
-from .protocol import (
+from .messages import (
     ErrorMessage,
     EventMessage,
     ExecuteMessage,
     OptionsMessage,
     PreparedResultMessage,
     PrepareMessage,
-    Protocol,
     QueryMessage,
     ReadyMessage,
     RegisterMessage,
@@ -26,6 +25,7 @@ from .protocol import (
     SupportedMessage,
     VoidResultMessage,
 )
+from .protocol import Protocol
 from .types import ExpectedResponses  # noqa: F401
 from .utils import get_logger
 

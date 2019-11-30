@@ -65,9 +65,11 @@ pysandra/ - most of the content in the top level are related to SDLC
          /dispatcher.py - handles the communications between the client and protocol
          /exceptions.py - exceptions for the driver
          /__init__.py - the API
-         /protocol.py - the encodes, decoders for the wire protocol
+         /messages.py - the wireprotocol messages (factories and encoders)
+         /codecs.py - the encodes, decoders routines
          /types.py - the data types that the API will send to the user
          /utils.py - some utility functions (e.g. loggin)
+         /protocol.py - the abstract base class for the protocol handler
          /v4protocol.py - this speaks to the dispatcher to decide how request should look on the wire, and how to handle responses
    tests/ - pytest tests (there are subdirectories for live testing
    tools/ - currently contains testasync.py which has some driver example cases

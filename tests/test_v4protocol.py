@@ -2,7 +2,7 @@ import pytest
 
 from pysandra.constants import Opcode
 from pysandra.exceptions import InternalDriverError
-from pysandra.protocol import PreparedResultMessage, PrepareMessage
+from pysandra.messages import PreparedResultMessage, PrepareMessage
 from pysandra.v4protocol import V4Protocol
 
 
