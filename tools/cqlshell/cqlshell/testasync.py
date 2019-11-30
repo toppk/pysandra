@@ -217,6 +217,8 @@ async def test_types(tester):
         "CREATE TABLE IF NOT EXISTS uprofile.countertypes (myascii ascii, mybigint bigint,  mycounter1 counter, "
         + "mycounter2 counter, PRIMARY KEY(myascii, mybigint))"
     )
+    await tester.run_query(" SELECT * FROM uprofile.alltypes", send_metadata=True)
+    return
     await tester.run_prepare(
         "INSERT INTO  uprofile.alltypes  (myascii, mybigint, myblob, myboolean, mydate, mydecimal, mydouble, "
         + "myfloat, myinet, myint, mysmallint, mytext, mytime, mytimestamp, mytimeuuid, mytinyint, myuuid, "
@@ -227,7 +229,7 @@ async def test_types(tester):
                 2,
                 b"\x03\x06",
                 False,
-                datetime.date(2019, 11, 29),
+                datetime.date.today(),
                 decimal.Decimal("600.12315455"),  # fix
                 7.123344,
                 8.344455999,
@@ -236,7 +238,7 @@ async def test_types(tester):
                 11,
                 "12",
                 13,
-                datetime.datetime(2019, 11, 29, 17, 41, 14, 138904),
+                datetime.datetime.now(),
                 uuid.UUID("769280c8-12f0-11ea-8899-60a44ce97462"),
                 16,
                 uuid.UUID("f92630a6-d994-440e-a2dc-fe6b28e93829"),
@@ -246,7 +248,6 @@ async def test_types(tester):
         ],
         consistency=pysandra.Consistency.ONE,
     )
-    await tester.run_query(" SELECT * FROM uprofile.alltypes", send_metadata=True)
 
 
 async def test_ddl(tester):

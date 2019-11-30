@@ -750,8 +750,8 @@ class ResultMessage(ResponseMessage):
                                 value, byteorder="big", signed=False
                             )
                             # logger.debug(f"date={date} pathma={date-2**31} value={value!r}")
-                            cell = datetime.datetime.fromtimestamp(
-                                timestamp / 10 ** 3, datetime.timezone.utc
+                            cell = datetime.datetime.utcfromtimestamp(
+                                timestamp / 10 ** 3
                             )
                         elif spec["option_id"] in (OptionID.DATE,):
                             date = int.from_bytes(value, byteorder="big", signed=False)
