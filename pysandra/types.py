@@ -64,8 +64,20 @@ class InetType(BaseType):
         ipaddr: Union["ipaddress.IPv4Address", "ipaddress.IPv6Address"],
         port: int,
     ) -> None:
-        self.ipaddr = ipaddress
+        self.ipaddr = ipaddr
         self.port = port
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, InetType):
+            return NotImplemented
+        return (
+            self.__class__ == other.__class__
+            and self.port == other.port
+            and self.ipaddr == other.ipaddr
+        )
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(ipaddr={self.ipaddr!r}, port={self.port})"
 
 
 class ChangeEvent:

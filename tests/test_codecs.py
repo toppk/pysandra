@@ -1,9 +1,12 @@
+import ipaddress
+
 import pytest
 
 from pysandra import codecs
 from pysandra.constants import Consistency
 from pysandra.core import SBytes
 from pysandra.exceptions import InternalDriverError
+from pysandra.types import InetType
 
 
 def test_codecs_get_bad_struct():
@@ -103,9 +106,36 @@ def test_codecs_decode_int_bytes_null():
     assert codecs.decode_int_bytes(body) is None
 
 
+def test_codecs_decode_int_bytes_must_err():
+    with pytest.raises(InternalDriverError, match=r"unexpected negative length"):
+        body = SBytes(b"\xff\xff\xff\xff")
+        codecs.decode_int_bytes_must(body)
+
+
+def test_codecs_decode_int_bytes_must_zero():
+    body = SBytes(b"\x00\x00\x00\x00")
+    assert codecs.decode_int_bytes_must(body) == b""
+
+
+def test_codecs_decode_int_bytes_must_plain():
+    body = SBytes(b"\00\00\00\04asdf")
+    assert codecs.decode_int_bytes_must(body) == b"asdf"
+
+
 def test_codecs_decode_int_bytes_plain():
     body = SBytes(b"\00\00\00\04asdf")
     assert codecs.decode_int_bytes(body) == b"asdf"
+
+
+def test_codecs_decode_int_bytes_ipv4():
+    body = SBytes(b"\x04\x09\x09\x09\x09\x00\x00\x01\xBB")
+    assert codecs.decode_inet(body) == InetType(ipaddress.IPv4Address("9.9.9.9"), 443)
+
+
+def test_codecs_decode_int_bytes_invalid():
+    with pytest.raises(InternalDriverError, match=r"unhandled inet length=5"):
+        body = SBytes(b"\x05\x09\x09\x09\x09\x00\x00\x01\xBB")
+        codecs.decode_inet(body)
 
 
 def test_codecs_decode_strings_list():

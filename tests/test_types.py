@@ -1,9 +1,27 @@
+from ipaddress import IPv4Address
+
 from pysandra import types
 
 
 def test_types_inet():
     o = types.InetType(1, 2)
     assert o.port == 2
+
+
+def test_types_inet_eq_good():
+    o = types.InetType(1, 2)
+    b = types.InetType(1, 2)
+    assert o == b
+
+
+def test_types_inet_eq_bad():
+    o = types.InetType(1, 2)
+    assert o != 2
+
+
+def test_types_inet_repr():
+    o = types.InetType(IPv4Address("9.9.9.9"), 0x01BB)
+    assert repr(o) == "InetType(ipaddr=IPv4Address('9.9.9.9'), port=443)"
 
 
 def test_types_topologychange():

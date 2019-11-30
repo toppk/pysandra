@@ -36,15 +36,18 @@ class Protocol:
         logger.debug(
             f"got head={header!r} containing version={version:x} flags={flags:x} stream={stream:x} opcode={opcode:x} length={length:x}"
         )
+        self._check_version(version)
+        return version, flags, stream, opcode, length
+
+    def _check_version(self, version: int) -> None:
         if self.server_role:
             expected_version = ~SERVER_SENT & self.version
         else:
             expected_version = SERVER_SENT | self.version
         if version != expected_version:
             raise VersionMismatchException(
-                f"received incorrect version from server, go version={hex(version)} expected version={hex(expected_version)}"
+                f"received incorrect version from server, got version={hex(version)} expected version={hex(expected_version)}"
             )
-        return version, flags, stream, opcode, length
 
     def event_handler(
         self,

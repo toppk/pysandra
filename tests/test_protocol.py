@@ -12,6 +12,16 @@ def test_protocol_header_good():
     assert data[4] == 1
 
 
+def test_protocol_header_server():
+    with pytest.raises(
+        exceptions.VersionMismatchException,
+        match=r"received incorrect version from server, got version=0x83 expected version=0x3",
+    ):
+        p = protocol.Protocol(server_role=True)
+        p.version = 3
+        p._check_version(0x83)
+
+
 def test_protocol_header_bad():
     with pytest.raises(
         exceptions.VersionMismatchException,
