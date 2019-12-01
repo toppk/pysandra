@@ -131,7 +131,6 @@ async def test_types_pagingrow_bigasynciter():
     d.add_row((b"3", b"4"))
     rows = []
     async for row in d:
-        print(row)
         rows.append(row)
     assert len(rows) == 6
 

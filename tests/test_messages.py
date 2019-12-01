@@ -241,6 +241,19 @@ def test_messages_rowresults_noglobal():
     assert msg.rows.col_specs[0]["name"] == "user_id"
 
 
+def test_messages_rowresults_pages():
+    body = (
+        b"\x00\x00\x00\x02\x00\x00\x00\x07\x00\x00\x00\x03\x00\x00\x00\x18\x04\x00\x00\x00"
+        + b"\x04\x08\x00\x06Ehtevs\xf0\x7f\xff\xff\xfb\xf0\x7f\xff\xff\xfe\x00\x00\x00\x01"
+        + b"\x00\x00\x00\x04\x00\x00\x00\x04\x00\x00\x00\x06Ehtevs\x00\x00\x00\x04Pune"
+    )
+    msg = messages.ResultMessage.build(1, 2, 3, SBytes(body),)
+    assert (
+        msg.rows.paging_state
+        == b"\x04\x00\x00\x00\x04\x08\x00\x06Ehtevs\xf0\x7f\xff\xff\xfb\xf0\x7f\xff\xff\xfe"
+    )
+
+
 def test_messages_voidresults():
     body = b"\x00\x00\x00\x01"
     msg = messages.ResultMessage.build(1, 2, 3, SBytes(body),)

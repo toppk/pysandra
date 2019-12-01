@@ -182,3 +182,5 @@ What is the correct CQL_VERSION (sec. 4.1.1).  If you send options first, what p
 * 8 - Clients should not rely on the actual size of the result set returned to decide if there are more
        results to fetch or not .  could there be has_more_pages with zero results?  That would complicate
        client implmentation.
+
+* why no casting if bind values encoded differently (tinyint vs int)

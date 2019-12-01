@@ -394,6 +394,10 @@ class ResultMessage(ResponseMessage):
             else:
                 rows = Rows(col_specs=col_specs)
             rows_count = decode_int(body)
+            if result_flags & ResultFlags.HAS_MORE_PAGES and rows_count == 0:
+                raise InternalDriverError(
+                    f"unsupported has more pages and zero row result"
+                )
             for _rowcnt in range(rows_count):
                 row: List[Optional["ExpectedType"]] = []
                 for colcnt in range(columns_count):

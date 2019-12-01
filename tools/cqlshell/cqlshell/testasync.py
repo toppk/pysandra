@@ -205,6 +205,9 @@ async def test_dml2(tester):
     await tester.run_query("SELECT * FROM uprofile.user where user_id=?", (2,))
     await tester.run_query("SELECT * FROM uprofile.user where user_id=:id", {"id": 3})
     await tester.run_query("SELECT * FROM uprofile.user where user_id=:id", {"id": 45})
+    # await tester.run_query(
+    #    "INSERT  INTO uprofile.alltypes (myint, mybigint) VALUES (?,?)", (12, 13)
+    # )
     await tester.run_empty_prepare(
         "INSERT INTO  uprofile.user  (user_id, user_name , user_bcity) VALUES (45, 'Trump', 'Washington D.C.')",
         2,
