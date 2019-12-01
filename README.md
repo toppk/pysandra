@@ -67,13 +67,13 @@ Aims to be:
 
 ## Todos
 
+* batch
 * tls context
-* paging
 * AUTH
+* string binding
 * Tests
 * api docs
 * make user objects user friendly (exceptions, EventChange, Rows)
-* batch
 * client connection routing
 * cqlshell
 
