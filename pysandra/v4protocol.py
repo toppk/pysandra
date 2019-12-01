@@ -58,15 +58,18 @@ class V4Protocol(Protocol):
 
     def query(self, stream_id: int, params: dict) -> "QueryMessage":
         assert params is not None
+        logger.debug(f"params is {params}")
         return QueryMessage(
             params["query"],
             params["query_params"],
             params["send_metadata"],
+            params["consistency"],
             self.version,
             self.flags(),
             stream_id,
             compress=self.compress,
-            consistency=params.get("consistency"),
+            page_size=params.get("page_size"),
+            paging_state=params.get("paging_state"),
         )
 
     def register(self, stream_id: int, params: dict) -> "RegisterMessage":
@@ -98,12 +101,14 @@ class V4Protocol(Protocol):
             statement_id,
             params["query_params"],
             params["send_metadata"],
+            params["consistency"],
             prepared.col_specs,
             self.version,
             self.flags(),
             stream_id,
             compress=self.compress,
-            consistency=params.get("consistency"),
+            page_size=params.get("page_size"),
+            paging_state=params.get("paging_state"),
         )
 
     def event_handler(

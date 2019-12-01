@@ -12,9 +12,10 @@ from .constants import (  # noqa: F401
     Consistency,
     Events,
 )
-from .exceptions import StartupTimeout, TypeViolation
+from .exceptions import InternalDriverError, StartupTimeout, TypeViolation
 from .protocol import Protocol  # noqa: F401
 from .types import ExpectedResponses  # noqa: F401
+from .types import PagingRows
 from .utils import get_logger
 
 logger = get_logger(__name__)
@@ -49,6 +50,7 @@ class Client:
         # this protocol will never be used, just placating mypy
         self._conn = Connection(host=host, use_tls=use_tls, no_compress=no_compress)
         self._in_startup = False
+        self._paged: Dict[bytes, Tuple[Callable, Dict[str, Any]]] = {}
         self._is_ready_event = asyncio.Event()
         if debug_signal is not None:
             self._install_signal(debug_signal)
@@ -120,12 +122,27 @@ class Client:
         return resp
 
     @online
+    async def page_(self, paging_state: bytes) -> "ExpectedResponses":
+        if paging_state not in self._paged:
+            raise InternalDriverError(f"unknown paging_state={paging_state!r}")
+        request_handler, params = self._paged.pop(paging_state)
+        logger.debug(f" have request_handler={request_handler} and params={params}")
+        params["paging_state"] = paging_state
+        resp = await self._conn.make_call(
+            request_handler, self._conn.protocol.build_response, params=params,
+        )
+        if isinstance(resp, PagingRows):
+            self._paging(resp, request_handler, params)
+        return resp
+
+    @online
     async def execute(
         self,
         stmt: str,
         args: Optional[Iterable] = None,
-        send_metadata: bool = True,  # growing up
-        consistency: "Consistency" = None,
+        send_metadata: bool = True,
+        page_size: Optional[int] = None,
+        consistency: "Consistency" = Consistency.ONE,
     ) -> "ExpectedResponses":
         logger.debug(f" in execte got args={args}")
         if isinstance(stmt, str):
@@ -134,28 +151,46 @@ class Client:
                 "query": stmt,
                 "query_params": args,
                 "send_metadata": send_metadata,
+                "consistency": consistency,
             }
-            if consistency is not None:
-                params["consistency"] = consistency
-            return await self._conn.make_call(
+            if page_size is not None:
+                params["page_size"] = page_size
+            resp = await self._conn.make_call(
                 self._conn.protocol.query,
                 self._conn.protocol.build_response,
                 params=params,
             )
+            if isinstance(resp, PagingRows):
+                self._paging(resp, self._conn.protocol.query, params)
+            return resp
         else:
             # execute (prepared statements)
             params = {
                 "statement_id": stmt,
                 "query_params": args,
                 "send_metadata": send_metadata,
+                "consistency": consistency,
             }
-            if consistency is not None:
-                params["consistency"] = consistency
-            return await self._conn.make_call(
+            if page_size is not None:
+                params["page_size"] = page_size
+            resp = await self._conn.make_call(
                 self._conn.protocol.execute,
                 self._conn.protocol.build_response,
                 params=params,
             )
+            if isinstance(resp, PagingRows):
+                self._paging(resp, self._conn.protocol.execute, params)
+            return resp
+
+    def _paging(
+        self, result: "PagingRows", request_handler: Callable, params: Dict[str, Any]
+    ) -> None:
+        result.page_ = self.page_
+        logger.debug(
+            f" storing request_handler={request_handler} and params={params} for paging_state={result.paging_state!r}"
+        )
+        assert result.paging_state is not None
+        self._paged[result.paging_state] = (request_handler, params)
 
     @online
     async def prepare(self, stmt: str) -> bytes:

@@ -343,6 +343,7 @@ def test_messages_execute_alltypes():
             19,
         ],
         False,
+        Consistency.ONE,
         [
             {
                 "ksname": "uprofile",
@@ -462,6 +463,5 @@ def test_messages_execute_alltypes():
         4,
         0,
         0,
-        consistency=Consistency.ONE,
     )
     assert msg.encode_body() == expected_body

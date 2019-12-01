@@ -55,6 +55,7 @@ from .exceptions import (
 from .types import ExpectedType  # noqa: F401
 from .types import (
     ChangeEvent,
+    PagingRows,
     Rows,
     SchemaChange,
     SchemaChangeType,
@@ -376,16 +377,22 @@ class ResultMessage(ResponseMessage):
             logger.debug(
                 f"ResultResponse result_flags={result_flags} columns_count={columns_count}"
             )
-            if result_flags & ResultFlags.HAS_MORE_PAGES != 0x00:
+            paging_state = None
+            if result_flags & ResultFlags.HAS_MORE_PAGES:
                 # parse paging state
-                raise InternalDriverError(f"need to parse paging state")
+                paging_state = decode_int_bytes_must(body)
             col_specs = None
             if (result_flags & ResultFlags.NO_METADATA) == 0x00 and columns_count > 0:
                 col_specs = ResultMessage.decode_col_specs(
                     result_flags, columns_count, body
                 )
             # parse rows
-            rows = Rows(columns_count, col_specs=col_specs)
+            if paging_state is not None:
+                rows: "Rows" = PagingRows(
+                    columns_count, col_specs=col_specs, paging_state=paging_state
+                )
+            else:
+                rows = Rows(columns_count, col_specs=col_specs)
             rows_count = decode_int(body)
             for _rowcnt in range(rows_count):
                 row: List[Optional["ExpectedType"]] = []
@@ -611,12 +618,16 @@ class ExecuteMessage(RequestMessage):
         query_id: bytes,
         query_params: Optional["Collection"],
         send_metadata: bool,
+        consistency: "Consistency",
         col_specs: List[dict],
         *args: Any,
-        consistency: "Consistency" = None,
+        page_size: int = None,
+        paging_state: bytes = None,
         **kwargs: Any,
     ) -> None:
         self.consistency = consistency
+        self.page_size = page_size
+        self.paging_state = paging_state
         self.query_id = query_id
         if query_params is None:
             query_params = []
@@ -640,6 +651,8 @@ class ExecuteMessage(RequestMessage):
             self.send_metadata,
             col_specs=self.col_specs,
             consistency=self.consistency,
+            page_size=self.page_size,
+            paging_state=self.paging_state,
         )
 
         #     [<n>[name_1]<value_1>...[name_n]<value_n>][<result_page_size>][<paging_state>][<serial_consistency>][<timestamp>]
@@ -655,11 +668,15 @@ class QueryMessage(RequestMessage):
         query: str,
         query_params: Optional["Collection"],
         send_metadata: bool,
+        consistency: "Consistency",
         *args: Any,
-        consistency: "Consistency" = None,
+        page_size: int = None,
+        paging_state: bytes = None,
         **kwargs: Any,
     ) -> None:
         self.consistency = consistency
+        self.page_size = page_size
+        self.paging_state = paging_state
         self.query = query
         if query_params is None:
             query_params = []
@@ -672,25 +689,29 @@ class QueryMessage(RequestMessage):
     def encode_query_parameters(
         query_params: "Collection",
         send_metadata: bool,
+        consistency: "Consistency",
         col_specs: Optional[List[dict]] = None,
-        consistency: "Consistency" = None,
+        page_size: int = None,
+        paging_state: bytes = None,
     ) -> bytes:
-        if consistency is None:
-            consistency = Consistency.ONE
 
         body: bytes = b""
         #   <consistency><flags>[<n>[name_1]<value_1>...[name_n]<value_n>][<result_page_size>][<paging_state>][<serial_consistency>][<timestamp>][<keyspace>][<now_in_seconds>]
         flags: int = 0x00
         if len(query_params) > 0:
-            flags |= QueryFlags.VALUES
             if isinstance(query_params, dict):
                 flags |= QueryFlags.WITH_NAMES_FOR_VALUES
+            flags |= QueryFlags.VALUES
+        if page_size is not None:
+            flags |= QueryFlags.PAGE_SIZE
+        if paging_state is not None:
+            flags |= QueryFlags.WITH_PAGING_STATE
         if not send_metadata:
             flags |= QueryFlags.SKIP_METADATA
         body += get_struct(f"{NETWORK_ORDER}{STypes.USHORT}{STypes.BYTE}").pack(
             consistency, flags
         )
-        if len(query_params) > 0:
+        if flags & QueryFlags.VALUES:
             body += encode_short(len(query_params))
             if col_specs is not None:
                 if isinstance(query_params, dict):
@@ -883,6 +904,12 @@ class QueryMessage(RequestMessage):
                     # <value_n>
                     for value in query_params:
                         body += encode_value(value)
+        if flags & QueryFlags.PAGE_SIZE:
+            assert page_size is not None
+            body += encode_int(page_size)
+        if flags & QueryFlags.WITH_PAGING_STATE:
+            assert paging_state is not None
+            body += encode_bytes(paging_state)
         logger.debug(
             f"lets' see the body={body!r} query_params={query_params} flags={flags}"
         )
@@ -891,7 +918,11 @@ class QueryMessage(RequestMessage):
     def encode_body(self) -> bytes:
         body = encode_long_string(self.query)
         body += QueryMessage.encode_query_parameters(
-            self.query_params, self.send_metadata, consistency=self.consistency
+            self.query_params,
+            self.send_metadata,
+            consistency=self.consistency,
+            page_size=self.page_size,
+            paging_state=self.paging_state,
         )
         return body
 

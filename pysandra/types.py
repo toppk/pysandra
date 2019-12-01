@@ -216,3 +216,35 @@ class Rows:
         current = self._data[self.index]
         self.index += 1
         return current
+
+
+class PagingRows(Rows):
+    def __init__(self, *args: Any, paging_state: bytes = None, **kwargs: Any) -> None:
+        self.paging_state = paging_state
+        self.page_: Optional[Callable] = None
+        super().__init__(*args, **kwargs)
+
+    def __aiter__(self) -> "PagingRows":
+        return self
+
+    async def _extend(self) -> None:
+        if self.page_ is None:
+            return
+        resp = await self.page_(self.paging_state)
+        if isinstance(resp, PagingRows):
+            self.paging_state = resp.paging_state
+        else:
+            self._page = None
+        for row in resp:
+            self.add_row(row)
+
+    async def __anext__(self) -> Union["Row", Tuple["ExpectedType", ...]]:
+        if self.index == len(self._data):
+            await self._extend()
+        if self.index == len(self._data):
+            # reset
+            self.index = 0
+            raise StopAsyncIteration
+        current = self._data[self.index]
+        self.index += 1
+        return current

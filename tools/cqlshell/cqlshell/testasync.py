@@ -34,9 +34,11 @@ class Tester:
         # will never end
         print(f"========> FINISHED")
 
-    async def run_simple_query(self, query, send_metadata=False):
+    async def run_simple_query(self, query, send_metadata=False, page_size=None):
         print(f"========> RUNNING {query}")
-        resp = await self.client.execute(query, send_metadata=send_metadata)
+        resp = await self.client.execute(
+            query, send_metadata=send_metadata, page_size=page_size
+        )
         if isinstance(resp, pysandra.Rows):
             for row in resp:
                 print(f"got row={row}")
@@ -50,10 +52,15 @@ class Tester:
             raise ValueError(f"unexpected response={resp}")
         print(f"========> FINISHED")
 
-    async def run_query(self, query, args=None, send_metadata=False):
+    async def run_query(self, query, args=None, send_metadata=False, page_size=None):
         print(f"========> RUNNING {query} args={args} send_metadata={send_metadata}")
-        resp = await self.client.execute(query, args, send_metadata=send_metadata)
-        if isinstance(resp, pysandra.Rows):
+        resp = await self.client.execute(
+            query, args, send_metadata=send_metadata, page_size=page_size
+        )
+        if isinstance(resp, pysandra.PagingRows):
+            async for row in resp:
+                print(f"got row={row}")
+        elif isinstance(resp, pysandra.Rows):
             for row in resp:
                 print(f"got row={row}")
         elif isinstance(resp, pysandra.SchemaChange):
@@ -135,6 +142,10 @@ async def test_meta(tester):
         [[45, "Trump", "Washington D.C."]],
         send_metadata=True,
     )
+
+
+async def test_pages(tester):
+    await tester.run_query("SELECT * from uprofile.user", page_size=1)
 
 
 async def test_dml(tester):
@@ -285,6 +296,7 @@ async def run(command, stop=False, port=None):
         "sim",
         "full",
         "dupddl",
+        "pages",
         "ssl",
         "types",
         "events",
@@ -309,6 +321,9 @@ async def run(command, stop=False, port=None):
     if command in ("bad",):
         await tester.connect()
         await test_bad(tester)
+    if command in ("pages",):
+        await tester.connect()
+        await test_pages(tester)
     if command in ("ssl",):
         await tester.connect()
         await test_tls(tester)

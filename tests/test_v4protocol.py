@@ -1,6 +1,6 @@
 import pytest
 
-from pysandra.constants import Opcode
+from pysandra.constants import Consistency, Opcode
 from pysandra.exceptions import InternalDriverError
 from pysandra.messages import PreparedResultMessage, PrepareMessage
 from pysandra.v4protocol import V4Protocol
@@ -53,11 +53,21 @@ def test_v4protocol_execute_success():
     prepare = PrepareMessage("", 0, 0, 0)
     result = PreparedResultMessage(stmt_id, [], [], 0, 0, 0, 0)
     v4.respond(prepare, result)
-    params = {"statement_id": stmt_id, "query_params": None, "send_metadata": False}
+    params = {
+        "statement_id": stmt_id,
+        "query_params": None,
+        "send_metadata": False,
+        "consistency": Consistency.ONE,
+    }
     assert v4.execute(1, params).opcode == Opcode.EXECUTE
 
 
 def test_v4protocol_query():
     v4 = V4Protocol()
-    params = {"query": "", "query_params": None, "send_metadata": False}
+    params = {
+        "query": "",
+        "query_params": None,
+        "send_metadata": False,
+        "consistency": Consistency.ONE,
+    }
     assert v4.query(1, params).opcode == Opcode.QUERY

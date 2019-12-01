@@ -7,7 +7,7 @@ from .exceptions import (  # noqa: F401
     InternalDriverError,
     ServerError,
 )
-from .types import Rows, SchemaChange  # noqa: F401
+from .types import PagingRows, Rows, SchemaChange  # noqa: F401
 from .utils import get_logger
 
 logger = get_logger(__name__)
