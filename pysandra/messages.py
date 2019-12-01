@@ -389,10 +389,10 @@ class ResultMessage(ResponseMessage):
             # parse rows
             if paging_state is not None:
                 rows: "Rows" = PagingRows(
-                    columns_count, col_specs=col_specs, paging_state=paging_state
+                    col_specs=col_specs, paging_state=paging_state
                 )
             else:
-                rows = Rows(columns_count, col_specs=col_specs)
+                rows = Rows(col_specs=col_specs)
             rows_count = decode_int(body)
             for _rowcnt in range(rows_count):
                 row: List[Optional["ExpectedType"]] = []

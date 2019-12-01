@@ -177,3 +177,8 @@ What is the correct CQL_VERSION (sec. 4.1.1).  If you send options first, what p
 * fault injection?
 
 * 6.6   varint encoding (see section 6.17), actually 6.23
+
+
+* 8 - Clients should not rely on the actual size of the result set returned to decide if there are more
+       results to fetch or not .  could there be has_more_pages with zero results?  That would complicate
+       client implmentation.

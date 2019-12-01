@@ -166,12 +166,9 @@ class Rows:
     This is the container for data queried from cassandra
     """
 
-    def __init__(
-        self, columns_count: int, col_specs: Optional[List[Dict[str, Any]]] = None
-    ) -> None:
+    def __init__(self, col_specs: Optional[List[Dict[str, Any]]] = None) -> None:
         self.index: int = 0
         self._data: List[Union["Row", Tuple["ExpectedType", ...]]] = []
-        self.columns_count = columns_count
         self._col_specs: Optional[List[Dict[str, Any]]] = None
         self._fields: Optional[List[str]] = None
         if col_specs is not None:
@@ -228,13 +225,15 @@ class PagingRows(Rows):
         return self
 
     async def _extend(self) -> None:
+        logger.debug(f"extend has page_={self.page_}")
         if self.page_ is None:
             return
         resp = await self.page_(self.paging_state)
+        # what about has more data with zero rows returned.
         if isinstance(resp, PagingRows):
             self.paging_state = resp.paging_state
         else:
-            self._page = None
+            self.page_ = None
         for row in resp:
             self.add_row(row)
 
